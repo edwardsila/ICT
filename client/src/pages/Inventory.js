@@ -13,7 +13,8 @@ const Inventory = () => {
     sent_for_repair_date: '',
     returned_date: '',
     repair_status: 'Repaired',
-    notes: ''
+    notes: '',
+    destination: ''
   });
   const [message, setMessage] = useState('');
   const handleChange = e => {
@@ -78,6 +79,14 @@ const Inventory = () => {
                   <div className="col-md-6">
                     <label className="form-label">Who Received It</label>
                     <input type="text" className="form-control" name="received_by" value={form.received_by} onChange={handleChange} placeholder="e.g. John Doe" required />
+                  </div>
+                </>
+              )}
+              {form.status === 'Out' && (
+                <>
+                  <div className="col-md-6">
+                    <label className="form-label">Where is it going to?</label>
+                    <input type="text" className="form-control" name="destination" value={form.destination} onChange={handleChange} placeholder="e.g. HR Department, Branch Office" required />
                   </div>
                 </>
               )}

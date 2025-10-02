@@ -36,17 +36,22 @@ const createTables = () => {
     item_type TEXT NOT NULL,
     status TEXT NOT NULL,
     received_date TEXT,
+    received_by TEXT,
     sent_for_repair_date TEXT,
     returned_date TEXT,
     repair_status TEXT,
-    notes TEXT
+    notes TEXT,
+    destination TEXT
   )`);
 
   db.run(`CREATE TABLE IF NOT EXISTS maintenance (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    floor TEXT NOT NULL,
-    maintenance_date TEXT NOT NULL,
-    details TEXT
+    date TEXT NOT NULL,
+    equipment TEXT NOT NULL,
+    tagnumber TEXT NOT NULL,
+    department TEXT NOT NULL,
+    equipment_model TEXT NOT NULL,
+    user TEXT NOT NULL
   )`);
 };
 
@@ -110,10 +115,10 @@ app.get('/api/inventory/:id', (req, res) => {
 });
 
 app.post('/api/inventory', (req, res) => {
-  const { item_name, item_type, status, received_date, sent_for_repair_date, returned_date, repair_status, notes } = req.body;
+  const { item_name, item_type, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination } = req.body;
   db.run(
-    `INSERT INTO inventory (item_name, item_type, status, received_date, sent_for_repair_date, returned_date, repair_status, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [item_name, item_type, status, received_date, sent_for_repair_date, returned_date, repair_status, notes],
+    `INSERT INTO inventory (item_name, item_type, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [item_name, item_type, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination],
     function (err) {
       if (err) return res.status(400).json({ error: err.message });
       res.json({ id: this.lastID });
@@ -122,10 +127,10 @@ app.post('/api/inventory', (req, res) => {
 });
 
 app.put('/api/inventory/:id', (req, res) => {
-  const { item_name, item_type, status, received_date, sent_for_repair_date, returned_date, repair_status, notes } = req.body;
+  const { item_name, item_type, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination } = req.body;
   db.run(
-    `UPDATE inventory SET item_name = ?, item_type = ?, status = ?, received_date = ?, sent_for_repair_date = ?, returned_date = ?, repair_status = ?, notes = ? WHERE id = ?`,
-    [item_name, item_type, status, received_date, sent_for_repair_date, returned_date, repair_status, notes, req.params.id],
+    `UPDATE inventory SET item_name = ?, item_type = ?, status = ?, received_date = ?, received_by = ?, sent_for_repair_date = ?, returned_date = ?, repair_status = ?, notes = ?, destination = ? WHERE id = ?`,
+    [item_name, item_type, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination, req.params.id],
     function (err) {
       if (err) return res.status(400).json({ error: err.message });
       res.json({ updated: this.changes });
@@ -157,10 +162,10 @@ app.get('/api/maintenance/:id', (req, res) => {
 });
 
 app.post('/api/maintenance', (req, res) => {
-  const { floor, maintenance_date, details } = req.body;
+  const { date, equipment, tagnumber, department, equipment_model, user } = req.body;
   db.run(
-    `INSERT INTO maintenance (floor, maintenance_date, details) VALUES (?, ?, ?)`,
-    [floor, maintenance_date, details],
+    `INSERT INTO maintenance (date, equipment, tagnumber, department, equipment_model, user) VALUES (?, ?, ?, ?, ?, ?)`,
+    [date, equipment, tagnumber, department, equipment_model, user],
     function (err) {
       if (err) return res.status(400).json({ error: err.message });
       res.json({ id: this.lastID });
@@ -169,10 +174,10 @@ app.post('/api/maintenance', (req, res) => {
 });
 
 app.put('/api/maintenance/:id', (req, res) => {
-  const { floor, maintenance_date, details } = req.body;
+  const { date, equipment, tagnumber, department, equipment_model, user } = req.body;
   db.run(
-    `UPDATE maintenance SET floor = ?, maintenance_date = ?, details = ? WHERE id = ?`,
-    [floor, maintenance_date, details, req.params.id],
+    `UPDATE maintenance SET date = ?, equipment = ?, tagnumber = ?, department = ?, equipment_model = ?, user = ? WHERE id = ?`,
+    [date, equipment, tagnumber, department, equipment_model, user, req.params.id],
     function (err) {
       if (err) return res.status(400).json({ error: err.message });
       res.json({ updated: this.changes });

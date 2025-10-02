@@ -3,9 +3,12 @@ import React, { useState } from 'react';
 
 const Maintenance = () => {
   const [form, setForm] = useState({
-    floor: '',
-    maintenance_date: '',
-    details: ''
+    date: '',
+    equipment: '',
+    tagnumber: '',
+    department: '',
+    equipment_model: '',
+    user: ''
   });
   const [message, setMessage] = useState('');
   const handleChange = e => {
@@ -22,7 +25,7 @@ const Maintenance = () => {
       });
       if (res.ok) {
         setMessage('Record added successfully!');
-        setForm({ floor: '', maintenance_date: '', details: '' });
+        setForm({ date: '', equipment: '', tagnumber: '', department: '', equipment_model: '', user: '' });
       } else {
         setMessage('Failed to add record.');
       }
@@ -39,16 +42,28 @@ const Maintenance = () => {
           <form onSubmit={handleSubmit}>
             <div className="row g-3">
               <div className="col-md-6">
-                <label className="form-label">Floor</label>
-                <input type="text" className="form-control" name="floor" value={form.floor} onChange={handleChange} placeholder="e.g. 2nd Floor" required />
+                <label className="form-label">Date</label>
+                <input type="date" className="form-control" name="date" value={form.date} onChange={handleChange} required />
               </div>
               <div className="col-md-6">
-                <label className="form-label">Maintenance Date</label>
-                <input type="date" className="form-control" name="maintenance_date" value={form.maintenance_date} onChange={handleChange} required />
+                <label className="form-label">Equipment</label>
+                <input type="text" className="form-control" name="equipment" value={form.equipment} onChange={handleChange} placeholder="e.g. Laptop, Printer" required />
               </div>
-              <div className="col-12">
-                <label className="form-label">Details</label>
-                <textarea className="form-control" name="details" value={form.details} onChange={handleChange} rows="2" placeholder="Maintenance details" required></textarea>
+              <div className="col-md-6">
+                <label className="form-label">Tag Number</label>
+                <input type="text" className="form-control" name="tagnumber" value={form.tagnumber} onChange={handleChange} placeholder="e.g. SVC12345" required />
+              </div>
+              <div className="col-md-6">
+                <label className="form-label">Department</label>
+                <input type="text" className="form-control" name="department" value={form.department} onChange={handleChange} placeholder="e.g. HR, Finance" required />
+              </div>
+              <div className="col-md-6">
+                <label className="form-label">Equipment Model</label>
+                <input type="text" className="form-control" name="equipment_model" value={form.equipment_model} onChange={handleChange} placeholder="e.g. Dell Latitude 5400" required />
+              </div>
+              <div className="col-md-6">
+                <label className="form-label">User of the Equipment</label>
+                <input type="text" className="form-control" name="user" value={form.user} onChange={handleChange} placeholder="e.g. John Doe" required />
               </div>
             </div>
             <button type="submit" className="btn btn-success mt-3 w-100">Add Record</button>

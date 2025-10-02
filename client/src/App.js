@@ -13,38 +13,69 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 
 
-// Placeholder page components
-const Home = () => (
-  <section className="hero-section d-flex align-items-center justify-content-center text-center">
-    <div className="container">
-      <div className="hero-content">
-        <h1 className="display-1 fw-bold text-gradient mb-4 animate__animated animate__fadeInDown">ICT Inventory & Maintenance System</h1>
-        <p className="lead fs-3 mb-4 animate__animated animate__fadeInUp animate__delay-1s">Track, manage, and report on all your ICT assets and maintenance activities with ease.</p>
-        <div className="d-flex justify-content-center gap-3 animate__animated animate__fadeInUp animate__delay-2s">
-          <Link to="/inventory" className="btn btn-lg btn-primary shadow">Get Started</Link>
-          <Link to="/reports" className="btn btn-lg btn-outline-light shadow">Learn More</Link>
+// MWALIMU National Sacco logo
+const mwalimuLogo = 'https://www.mwalimusacco.coop/wp-content/uploads/2022/09/logo.png';
+
+
+
+function ModernHome() {
+  return (
+    <div className="container py-5">
+      <div className="row justify-content-center mb-4">
+        <div className="col-md-8 text-center">
+          <img src={mwalimuLogo} alt="Mwalimu Sacco Logo" style={{height: '60px', marginBottom: '16px'}} />
+          <h1 className="fw-bold mb-2" style={{color: '#1b5e20'}}>MWALIMU Towers ICT Portal</h1>
+          <p className="lead" style={{color: '#333'}}>Welcome to the MWALIMU National Sacco ICT system for MWALIMU Towers. Manage inventory, maintenance, and reports with ease.</p>
         </div>
       </div>
-      {/* Moving Parts: Animated Icons */}
-      <div className="mt-5 d-flex justify-content-center gap-4 animate__animated animate__fadeIn animate__delay-3s">
-        <span className="hero-icon"><i className="bi bi-hdd-network fs-1 text-primary"></i></span>
-        <span className="hero-icon"><i className="bi bi-tools fs-1 text-warning"></i></span>
-        <span className="hero-icon"><i className="bi bi-building fs-1 text-info"></i></span>
-        <span className="hero-icon"><i className="bi bi-bar-chart-line fs-1 text-success"></i></span>
+      <div className="row g-4 justify-content-center">
+        <div className="col-md-4">
+          <div className="card shadow h-100 text-center">
+            <div className="card-body">
+              <i className="bi bi-box-seam display-4 text-success mb-3"></i>
+              <h4 className="mb-2">Inventory</h4>
+              <p>Track and manage all ICT equipment and assets.</p>
+              <Link to="/inventory" className="btn btn-success w-100">Go to Inventory</Link>
+            </div>
+          </div>
+        </div>
+        <div className="col-md-4">
+          <div className="card shadow h-100 text-center">
+            <div className="card-body">
+              <i className="bi bi-tools display-4 text-warning mb-3"></i>
+              <h4 className="mb-2">Maintenance</h4>
+              <p>Log and review maintenance activities by floor.</p>
+              <Link to="/maintenance" className="btn btn-warning w-100">Go to Maintenance</Link>
+            </div>
+          </div>
+        </div>
+        <div className="col-md-4">
+          <div className="card shadow h-100 text-center">
+            <div className="card-body">
+              <i className="bi bi-bar-chart-line display-4 text-info mb-3"></i>
+              <h4 className="mb-2">Reports</h4>
+              <p>Generate and view reports for ICT operations.</p>
+              <Link to="/reports" className="btn btn-info w-100">Go to Reports</Link>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-  </section>
-);
+  );
+}
 
 function App() {
   return (
     <Router>
       {/* Navigation Bar */}
-      <nav className="navbar navbar-expand-lg navbar-dark bg-dark shadow">
+      <nav className="navbar navbar-expand-lg navbar-dark mwalimu-navbar shadow">
         <div className="container-fluid">
           <div className="d-flex w-100 align-items-center">
-            {/* Brand left */}
-            <Link className="navbar-brand fw-bold fs-2 me-3" to="/">ICT Inventory</Link>
+            {/* Brand left with logo */}
+            <Link className="navbar-brand d-flex align-items-center me-3" to="/">
+              <img src={mwalimuLogo} alt="Mwalimu Sacco Logo" style={{height: '40px', marginRight: '10px'}} />
+              <span className="fw-bold fs-2" style={{color: '#1b5e20'}}>MWALIMU Towers ICT</span>
+            </Link>
             {/* Centered nav links */}
             <div className="flex-grow-1 d-flex justify-content-center">
               <ul className="navbar-nav">
@@ -79,7 +110,7 @@ function App() {
 
       {/* Page Content */}
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<ModernHome />} />
         <Route path="/inventory" element={<Inventory />} />
         <Route path="/maintenance" element={<Maintenance />} />
         <Route path="/reports" element={<Reports />} />
@@ -91,7 +122,7 @@ function App() {
       {/* Footer */}
       <footer className="bg-dark text-light py-4 mt-5">
         <div className="container text-center">
-          <span>&copy; {new Date().getFullYear()} ICT Inventory & Maintenance System. All rights reserved.</span>
+          <span>&copy; {new Date().getFullYear()} MWALIMU Towers ICT System. All rights reserved.</span>
         </div>
       </footer>
     </Router>
