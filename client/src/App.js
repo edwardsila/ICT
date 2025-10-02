@@ -23,7 +23,7 @@ function ModernHome() {
     <div className="container py-5">
       <div className="row justify-content-center mb-4">
         <div className="col-md-8 text-center">
-          <img src={mwalimuLogo} alt="Mwalimu Sacco Logo" style={{height: '60px', marginBottom: '16px'}} />
+          <img src={mwalimuLogo} alt="Mwalimu Sacco Logo" style={{height: '120px', maxWidth: '320px', marginBottom: '24px', borderRadius: '24px', boxShadow: '0 4px 24px rgba(31,38,135,0.25)', background: '#fff', padding: '12px'}} />
           <h1 className="fw-bold mb-2" style={{color: '#1b5e20'}}>MNSS ICT Portal</h1>
           <p className="lead" style={{color: '#333'}}>Welcome to the MWALIMU NATIONAL SACCO ICT system for MWALIMU Towers. Manage inventory, maintenance, and reports with ease.</p>
         </div>
@@ -72,8 +72,8 @@ function App() {
         <div className="container-fluid position-relative">
           {/* Brand left with logo */}
           <Link className="navbar-brand d-flex align-items-center me-3" to="/">
-            <img src={mwalimuLogo} alt="Mwalimu Sacco Logo" style={{height: '40px', marginRight: '10px'}} />
-            <span className="fw-bold fs-2" style={{color: '#1b5e20'}}>MWALIMU Towers ICT</span>
+            <img src={mwalimuLogo} alt="Mwalimu Sacco Logo" style={{height: '40px', marginRight: '10px', borderRadius: '8px', background: 'rgba(27,94,32,0.9)', padding: '4px', border: '2px solid #fbc02d'}} />
+            <span className="fw-bold fs-2" style={{color: '#fbc02d'}}>MWALIMU Towers ICT</span>
           </Link>
           {/* Absolutely centered nav links */}
           <div style={{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-50%)',zIndex:2}}>
