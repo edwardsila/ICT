@@ -1,16 +1,4 @@
 // ...existing code...
-// Update user role (admin only)
-app.put('/api/users/:id/role', (req, res) => {
-  const { role } = req.body;
-  if (!role || !['user', 'admin'].includes(role)) {
-    return res.status(400).json({ error: 'Invalid role' });
-  }
-  db.run('UPDATE users SET role = ? WHERE id = ?', [role, req.params.id], function (err) {
-    if (err) return res.status(500).json({ error: err.message });
-    if (this.changes === 0) return res.status(404).json({ error: 'User not found' });
-    res.json({ updated: true });
-  });
-});
 
 // Import and initialize
 const express = require('express');
@@ -47,6 +35,7 @@ const createTables = () => {
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     item_name TEXT NOT NULL,
     item_type TEXT NOT NULL,
+    service_tag TEXT,
     status TEXT NOT NULL,
     received_date TEXT,
     received_by TEXT,
@@ -128,10 +117,10 @@ app.get('/api/inventory/:id', (req, res) => {
 });
 
 app.post('/api/inventory', (req, res) => {
-  const { item_name, item_type, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination } = req.body;
+  const { item_name, item_type, service_tag, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination } = req.body;
   db.run(
-    `INSERT INTO inventory (item_name, item_type, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [item_name, item_type, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination],
+    `INSERT INTO inventory (item_name, item_type, service_tag, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [item_name, item_type, service_tag, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination],
     function (err) {
       if (err) return res.status(400).json({ error: err.message });
       res.json({ id: this.lastID });
@@ -140,10 +129,10 @@ app.post('/api/inventory', (req, res) => {
 });
 
 app.put('/api/inventory/:id', (req, res) => {
-  const { item_name, item_type, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination } = req.body;
+  const { item_name, item_type, service_tag, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination } = req.body;
   db.run(
-    `UPDATE inventory SET item_name = ?, item_type = ?, status = ?, received_date = ?, received_by = ?, sent_for_repair_date = ?, returned_date = ?, repair_status = ?, notes = ?, destination = ? WHERE id = ?`,
-    [item_name, item_type, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination, req.params.id],
+    `UPDATE inventory SET item_name = ?, item_type = ?, service_tag = ?, status = ?, received_date = ?, received_by = ?, sent_for_repair_date = ?, returned_date = ?, repair_status = ?, notes = ?, destination = ? WHERE id = ?`,
+    [item_name, item_type, service_tag, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination, req.params.id],
     function (err) {
       if (err) return res.status(400).json({ error: err.message });
       res.json({ updated: this.changes });
