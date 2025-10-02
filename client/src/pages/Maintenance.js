@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 const Maintenance = () => {
   const [form, setForm] = useState({
@@ -35,6 +36,9 @@ const Maintenance = () => {
   };
   return (
     <div className="container py-5">
+      <div className="mb-3">
+        <Link to="/" className="btn btn-outline-secondary"><i className="bi bi-arrow-left"></i> Back to Home</Link>
+      </div>
       <h2 className="mb-4">Maintenance</h2>
       <div className="card shadow mb-4">
         <div className="card-body">

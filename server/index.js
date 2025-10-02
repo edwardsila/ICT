@@ -102,8 +102,12 @@ app.get('/api/users', (req, res) => {
 
 // Inventory CRUD
 app.get('/api/inventory', (req, res) => {
+  //console.log('[GET] /api/inventory');
   db.all('SELECT * FROM inventory', [], (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
+    if (err) {
+      console.error('Error fetching inventory:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
     res.json(rows);
   });
 });
@@ -117,24 +121,32 @@ app.get('/api/inventory/:id', (req, res) => {
 });
 
 app.post('/api/inventory', (req, res) => {
+  //console.log('[POST] /api/inventory', req.body);
   const { item_name, item_type, service_tag, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination } = req.body;
   db.run(
     `INSERT INTO inventory (item_name, item_type, service_tag, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [item_name, item_type, service_tag, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination],
     function (err) {
-      if (err) return res.status(400).json({ error: err.message });
+      if (err) {
+        console.error('Error inserting inventory:', err.message);
+        return res.status(400).json({ error: err.message });
+      }
       res.json({ id: this.lastID });
     }
   );
 });
 
 app.put('/api/inventory/:id', (req, res) => {
+  //console.log('[PUT] /api/inventory/' + req.params.id, req.body);
   const { item_name, item_type, service_tag, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination } = req.body;
   db.run(
     `UPDATE inventory SET item_name = ?, item_type = ?, service_tag = ?, status = ?, received_date = ?, received_by = ?, sent_for_repair_date = ?, returned_date = ?, repair_status = ?, notes = ?, destination = ? WHERE id = ?`,
     [item_name, item_type, service_tag, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination, req.params.id],
     function (err) {
-      if (err) return res.status(400).json({ error: err.message });
+      if (err) {
+        console.error('Error updating inventory:', err.message);
+        return res.status(400).json({ error: err.message });
+      }
       res.json({ updated: this.changes });
     }
   );

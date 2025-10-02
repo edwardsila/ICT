@@ -38,6 +38,9 @@ const Register = () => {
 
   return (
     <div className="container py-5 d-flex justify-content-center align-items-center" style={{minHeight: '80vh'}}>
+      <div className="mb-3 text-center">
+        <Link to="/" className="btn btn-outline-secondary"><i className="bi bi-arrow-left"></i> Back to Home</Link>
+      </div>
       <div className="glass-card p-4" style={{maxWidth: 400, width: '100%'}}>
         <div className="text-center mb-4">
           <i className="bi bi-person-plus-fill display-3 text-warning mb-2"></i>

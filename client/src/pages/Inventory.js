@@ -1,6 +1,7 @@
 
 
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 const Inventory = () => {
   const [form, setForm] = useState({
@@ -23,26 +24,34 @@ const Inventory = () => {
   const handleSubmit = async e => {
     e.preventDefault();
     setMessage('');
+    console.log('[Inventory Submit] Sending:', form);
     try {
       const res = await fetch('/api/inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form)
       });
+      console.log('[Inventory Submit] Response status:', res.status);
       if (res.ok) {
         setMessage('Item added successfully!');
         setForm({
           item_name: '', item_type: '', service_tag: '', status: 'In', received_date: '', received_by: '', sent_for_repair_date: '', returned_date: '', repair_status: 'Repaired', notes: ''
         });
       } else {
+        const errorData = await res.json();
+        console.error('[Inventory Submit] Error:', errorData);
         setMessage('Failed to add item.');
       }
-    } catch {
+    } catch (err) {
+      console.error('[Inventory Submit] Network error:', err);
       setMessage('Error connecting to server.');
     }
   };
   return (
     <div className="container py-5">
+      <div className="mb-3">
+        <Link to="/" className="btn btn-outline-secondary"><i className="bi bi-arrow-left"></i> Back to Home</Link>
+      </div>
       <h2 className="mb-4">Inventory</h2>
       <div className="card shadow mb-4">
         <div className="card-body">
