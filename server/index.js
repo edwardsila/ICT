@@ -1,3 +1,16 @@
+// ...existing code...
+// Update user role (admin only)
+app.put('/api/users/:id/role', (req, res) => {
+  const { role } = req.body;
+  if (!role || !['user', 'admin'].includes(role)) {
+    return res.status(400).json({ error: 'Invalid role' });
+  }
+  db.run('UPDATE users SET role = ? WHERE id = ?', [role, req.params.id], function (err) {
+    if (err) return res.status(500).json({ error: err.message });
+    if (this.changes === 0) return res.status(404).json({ error: 'User not found' });
+    res.json({ updated: true });
+  });
+});
 
 // Import and initialize
 const express = require('express');
