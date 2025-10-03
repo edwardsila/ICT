@@ -123,12 +123,17 @@ app.get('/api/inventory/:id', (req, res) => {
 app.post('/api/inventory', (req, res) => {
   //console.log('[POST] /api/inventory', req.body);
   const { item_name, item_type, service_tag, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination } = req.body;
+  // Validate required fields
+  if (!item_name || !item_type || !status) {
+    console.error('Missing required inventory fields:', req.body);
+    return res.status(400).json({ error: 'Missing required fields: item_name, item_type, status' });
+  }
   db.run(
     `INSERT INTO inventory (item_name, item_type, service_tag, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [item_name, item_type, service_tag, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination],
     function (err) {
       if (err) {
-        console.error('Error inserting inventory:', err.message);
+        console.error('Error inserting inventory:', err.message, req.body);
         return res.status(400).json({ error: err.message });
       }
       res.json({ id: this.lastID });
@@ -177,11 +182,19 @@ app.get('/api/maintenance/:id', (req, res) => {
 
 app.post('/api/maintenance', (req, res) => {
   const { date, equipment, tagnumber, department, equipment_model, user } = req.body;
+  // Validate required fields
+  if (!date || !equipment || !tagnumber || !department || !equipment_model || !user) {
+    console.error('Missing required maintenance fields:', req.body);
+    return res.status(400).json({ error: 'Missing required fields: date, equipment, tagnumber, department, equipment_model, user' });
+  }
   db.run(
     `INSERT INTO maintenance (date, equipment, tagnumber, department, equipment_model, user) VALUES (?, ?, ?, ?, ?, ?)`,
     [date, equipment, tagnumber, department, equipment_model, user],
     function (err) {
-      if (err) return res.status(400).json({ error: err.message });
+      if (err) {
+        console.error('Error inserting maintenance:', err.message, req.body);
+        return res.status(400).json({ error: err.message });
+      }
       res.json({ id: this.lastID });
     }
   );

@@ -73,7 +73,7 @@ function App() {
           {/* Brand left with logo */}
           <Link className="navbar-brand d-flex align-items-center me-3" to="/">
             <img src={mwalimuLogo} alt="Mwalimu Sacco Logo" style={{height: '40px', marginRight: '10px', borderRadius: '8px', background: 'rgba(27,94,32,0.9)', padding: '4px', border: '2px solid #fbc02d'}} />
-            <span className="fw-bold fs-2" style={{color: '#fbc02d'}}>MWALIMU Towers ICT</span>
+            <span className="fw-bold fs-2" style={{color: '#fbc02d'}}>MWALIMU ICT</span>
           </Link>
           {/* Absolutely centered nav links */}
           <div style={{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-50%)',zIndex:2}}>

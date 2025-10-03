@@ -28,9 +28,10 @@ const Maintenance = () => {
         setMessage('Record added successfully!');
         setForm({ date: '', equipment: '', tagnumber: '', department: '', equipment_model: '', user: '' });
       } else {
-        setMessage('Failed to add record.');
+        const errorData = await res.json();
+        setMessage(errorData.error ? `Failed to add record: ${errorData.error}` : 'Failed to add record.');
       }
-    } catch {
+    } catch (err) {
       setMessage('Error connecting to server.');
     }
   };

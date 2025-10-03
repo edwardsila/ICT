@@ -5,17 +5,13 @@ import { Link } from 'react-router-dom';
 
 const Inventory = () => {
   const [form, setForm] = useState({
-    item_name: '',
-    item_type: '',
-    service_tag: '',
-    status: 'In',
-    received_date: '',
-    received_by: '',
-    sent_for_repair_date: '',
-    returned_date: '',
-    repair_status: 'Repaired',
-    notes: '',
-    destination: ''
+    asset_no: '',
+    asset_type: '',
+    serial_no: '',
+    manufacturer: '',
+    model: '',
+    version: '',
+    status: 'Active'
   });
   const [message, setMessage] = useState('');
   const handleChange = e => {
@@ -35,12 +31,12 @@ const Inventory = () => {
       if (res.ok) {
         setMessage('Item added successfully!');
         setForm({
-          item_name: '', item_type: '', service_tag: '', status: 'In', received_date: '', received_by: '', sent_for_repair_date: '', returned_date: '', repair_status: 'Repaired', notes: ''
+          asset_no: '', asset_type: '', serial_no: '', manufacturer: '', model: '', version: '', status: 'Active'
         });
       } else {
         const errorData = await res.json();
         console.error('[Inventory Submit] Error:', errorData);
-        setMessage('Failed to add item.');
+        setMessage(errorData.error ? `Failed to add item: ${errorData.error}` : 'Failed to add item.');
       }
     } catch (err) {
       console.error('[Inventory Submit] Network error:', err);
@@ -59,69 +55,37 @@ const Inventory = () => {
           <form onSubmit={handleSubmit}>
             <div className="row g-3">
               <div className="col-md-6">
-                <label className="form-label">Item Name</label>
-                <input type="text" className="form-control" name="item_name" value={form.item_name} onChange={handleChange} placeholder="e.g. Cisco Phone" required />
+                <label className="form-label">Asset No</label>
+                <input type="text" className="form-control" name="asset_no" value={form.asset_no} onChange={handleChange} placeholder="e.g. 12345" required />
               </div>
               <div className="col-md-6">
-                <label className="form-label">Item Type</label>
-                <input type="text" className="form-control" name="item_type" value={form.item_type} onChange={handleChange} placeholder="e.g. Router, Monitor" required />
+                <label className="form-label">Asset Type</label>
+                <input type="text" className="form-control" name="asset_type" value={form.asset_type} onChange={handleChange} placeholder="e.g. Laptop, Printer" required />
               </div>
               <div className="col-md-6">
-                <label className="form-label">Service Tag</label>
-                <input type="text" className="form-control" name="service_tag" value={form.service_tag} onChange={handleChange} placeholder="e.g. SVC12345" required />
+                <label className="form-label">Serial No</label>
+                <input type="text" className="form-control" name="serial_no" value={form.serial_no} onChange={handleChange} placeholder="e.g. SN123456" required />
+              </div>
+              <div className="col-md-6">
+                <label className="form-label">Manufacturer</label>
+                <input type="text" className="form-control" name="manufacturer" value={form.manufacturer} onChange={handleChange} placeholder="e.g. Dell" required />
+              </div>
+              <div className="col-md-6">
+                <label className="form-label">Model</label>
+                <input type="text" className="form-control" name="model" value={form.model} onChange={handleChange} placeholder="e.g. Latitude 5400" required />
+              </div>
+              <div className="col-md-6">
+                <label className="form-label">Version</label>
+                <input type="text" className="form-control" name="version" value={form.version} onChange={handleChange} placeholder="e.g. 2023" required />
               </div>
               <div className="col-md-6">
                 <label className="form-label">Status</label>
                 <select className="form-select" name="status" value={form.status} onChange={handleChange} required>
-                  <option>In</option>
-                  <option>Out</option>
+                  <option>Active</option>
+                  <option>Inactive</option>
                   <option>Repair</option>
+                  <option>Disposed</option>
                 </select>
-              </div>
-              {/* Dynamic fields based on status */}
-              {form.status === 'In' && (
-                <>
-                  <div className="col-md-6">
-                    <label className="form-label">Received Date</label>
-                    <input type="date" className="form-control" name="received_date" value={form.received_date} onChange={handleChange} required />
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label">Who Received It</label>
-                    <input type="text" className="form-control" name="received_by" value={form.received_by} onChange={handleChange} placeholder="e.g. John Doe" required />
-                  </div>
-                </>
-              )}
-              {form.status === 'Out' && (
-                <>
-                  <div className="col-md-6">
-                    <label className="form-label">Where is it going to?</label>
-                    <input type="text" className="form-control" name="destination" value={form.destination} onChange={handleChange} placeholder="e.g. HR Department, Branch Office" required />
-                  </div>
-                </>
-              )}
-              {form.status === 'Repair' && (
-                <>
-                  <div className="col-md-6">
-                    <label className="form-label">Sent for Repair Date</label>
-                    <input type="date" className="form-control" name="sent_for_repair_date" value={form.sent_for_repair_date} onChange={handleChange} required />
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label">Returned Date</label>
-                    <input type="date" className="form-control" name="returned_date" value={form.returned_date} onChange={handleChange} />
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label">Repair Status</label>
-                    <select className="form-select" name="repair_status" value={form.repair_status} onChange={handleChange} required>
-                      <option>Repaired</option>
-                      <option>Not Repaired</option>
-                      <option>Sent Back</option>
-                    </select>
-                  </div>
-                </>
-              )}
-              <div className="col-12">
-                <label className="form-label">Notes</label>
-                <textarea className="form-control" name="notes" value={form.notes} onChange={handleChange} rows="2" placeholder="Additional notes"></textarea>
               </div>
             </div>
             <button type="submit" className="btn btn-primary mt-3 w-100">Add Item</button>
