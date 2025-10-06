@@ -59,7 +59,7 @@ const createTables = () => {
     tagnumber VARCHAR(50) NOT NULL,
     department VARCHAR(50) NOT NULL,
     equipment_model VARCHAR(50) NOT NULL,
-    user VARCHAR(50) NOT NULL
+    "user" VARCHAR(50) NOT NULL
   )`);
 };
 
