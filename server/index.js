@@ -24,6 +24,7 @@ app.use(session({
     maxAge: 60 * 60 * 1000 // 1 hour in milliseconds
   }
 }));
+app.use(express.static(path.join(__dirname, '../client/build')));
 
 // Database setup
 const dbPath = path.join(__dirname, 'ict_inventory.db');
@@ -348,6 +349,11 @@ app.post('/api/logout', requireLogin, (req, res) => {
 
 app.get('/', (req, res) => {
   res.send('ICT Inventory & Maintenance API running');
+});
+
+// Serve React frontend for all other routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
 });
 
 app.listen(PORT, () => {
