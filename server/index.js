@@ -33,17 +33,13 @@ const createTables = () => {
 
   db.run(`CREATE TABLE IF NOT EXISTS inventory (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    item_name TEXT NOT NULL,
-    item_type TEXT NOT NULL,
-    service_tag TEXT,
-    status TEXT NOT NULL,
-    received_date TEXT,
-    received_by TEXT,
-    sent_for_repair_date TEXT,
-    returned_date TEXT,
-    repair_status TEXT,
-    notes TEXT,
-    destination TEXT
+    asset_no TEXT NOT NULL,
+    asset_type TEXT NOT NULL,
+    serial_no TEXT,
+    manufacturer TEXT,
+    model TEXT,
+    version TEXT,
+    status TEXT NOT NULL
   )`);
 
   db.run(`CREATE TABLE IF NOT EXISTS maintenance (
@@ -122,15 +118,15 @@ app.get('/api/inventory/:id', (req, res) => {
 
 app.post('/api/inventory', (req, res) => {
   //console.log('[POST] /api/inventory', req.body);
-  const { item_name, item_type, service_tag, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination } = req.body;
+  const { asset_no, asset_type, serial_no, manufacturer, model, version, status } = req.body;
   // Validate required fields
-  if (!item_name || !item_type || !status) {
+  if (!asset_no || !asset_type || !status) {
     console.error('Missing required inventory fields:', req.body);
-    return res.status(400).json({ error: 'Missing required fields: item_name, item_type, status' });
+    return res.status(400).json({ error: 'Missing required fields: asset_no, asset_type, status' });
   }
   db.run(
-    `INSERT INTO inventory (item_name, item_type, service_tag, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [item_name, item_type, service_tag, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination],
+    `INSERT INTO inventory (asset_no, asset_type, serial_no, manufacturer, model, version, status) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [asset_no, asset_type, serial_no, manufacturer, model, version, status],
     function (err) {
       if (err) {
         console.error('Error inserting inventory:', err.message, req.body);
@@ -143,10 +139,10 @@ app.post('/api/inventory', (req, res) => {
 
 app.put('/api/inventory/:id', (req, res) => {
   //console.log('[PUT] /api/inventory/' + req.params.id, req.body);
-  const { item_name, item_type, service_tag, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination } = req.body;
+  const { asset_no, asset_type, serial_no, manufacturer, model, version, status } = req.body;
   db.run(
-    `UPDATE inventory SET item_name = ?, item_type = ?, service_tag = ?, status = ?, received_date = ?, received_by = ?, sent_for_repair_date = ?, returned_date = ?, repair_status = ?, notes = ?, destination = ? WHERE id = ?`,
-    [item_name, item_type, service_tag, status, received_date, received_by, sent_for_repair_date, returned_date, repair_status, notes, destination, req.params.id],
+    `UPDATE inventory SET asset_no = ?, asset_type = ?, serial_no = ?, manufacturer = ?, model = ?, version = ?, status = ? WHERE id = ?`,
+    [asset_no, asset_type, serial_no, manufacturer, model, version, status, req.params.id],
     function (err) {
       if (err) {
         console.error('Error updating inventory:', err.message);

@@ -39,21 +39,7 @@ const Reports = () => {
       const res = await fetch(url);
       if (!res.ok) throw new Error('Failed to fetch report');
       let items = await res.json();
-      // Filter by date
-      const { start, end } = getDateRange(timeRange);
-      if (reportType === 'inventory') {
-        items = items.filter(item => {
-          if (!item.received_date) return false;
-          const d = new Date(item.received_date);
-          return d >= start && d <= end;
-        });
-      } else {
-        items = items.filter(item => {
-          if (!item.date) return false;
-          const d = new Date(item.date);
-          return d >= start && d <= end;
-        });
-      }
+      // Show all records, no date filtering
       setData(items);
     } catch (err) {
       setError(err.message);
@@ -97,13 +83,13 @@ const Reports = () => {
                   <tr>
                     {reportType === 'inventory' ? (
                       <>
-                        <th>Item Name</th>
-                        <th>Type</th>
+                        <th>Asset No</th>
+                        <th>Asset Type</th>
+                        <th>Serial No</th>
+                        <th>Manufacturer</th>
+                        <th>Model</th>
+                        <th>Version</th>
                         <th>Status</th>
-                        <th>Received Date</th>
-                        <th>Received By</th>
-                        <th>Notes</th>
-                        <th>Destination</th>
                       </>
                     ) : (
                       <>
@@ -120,13 +106,13 @@ const Reports = () => {
                 <tbody>
                   {data.map((item, idx) => reportType === 'inventory' ? (
                     <tr key={idx}>
-                      <td>{item.item_name}</td>
-                      <td>{item.item_type}</td>
+                      <td>{item.asset_no}</td>
+                      <td>{item.asset_type}</td>
+                      <td>{item.serial_no}</td>
+                      <td>{item.manufacturer}</td>
+                      <td>{item.model}</td>
+                      <td>{item.version}</td>
                       <td>{item.status}</td>
-                      <td>{item.received_date}</td>
-                      <td>{item.received_by}</td>
-                      <td>{item.notes}</td>
-                      <td>{item.destination}</td>
                     </tr>
                   ) : (
                     <tr key={idx}>
