@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
@@ -22,6 +21,7 @@ const Login = () => {
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(form)
       });
       const data = await res.json();
@@ -34,6 +34,11 @@ const Login = () => {
           window.location.href = '/';
         }, 800);
       } else {
+        if (res.status === 401 || res.status === 403) {
+          localStorage.removeItem('user');
+          window.location.href = '/login';
+          return;
+        }
         setMessage(data.error || 'Login failed.');
       }
     } catch {
@@ -47,7 +52,7 @@ const Login = () => {
         <div className="text-center mb-4">
           <i className="bi bi-shield-lock-fill display-3 text-success mb-2"></i>
           <h2 className="fw-bold mb-1" style={{color: '#1b5e20'}}>Login</h2>
-          <p className="text-muted">Welcome back to MWALIMU Towers ICT</p>
+          <p className="text-muted">Welcome back to MWALIMU ICT</p>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="mb-3">

@@ -24,10 +24,16 @@ const Admin = () => {
       setLoading(true);
       try {
         const [usersRes, inventoryRes, maintenanceRes] = await Promise.all([
-          fetch('/api/users'),
-          fetch('/api/inventory'),
-          fetch('/api/maintenance')
+          fetch('/api/users', { credentials: 'include' }),
+          fetch('/api/inventory', { credentials: 'include' }),
+          fetch('/api/maintenance', { credentials: 'include' })
         ]);
+        // Handle session expiration or forbidden
+        if (usersRes.status === 401 || usersRes.status === 403 || inventoryRes.status === 401 || inventoryRes.status === 403 || maintenanceRes.status === 401 || maintenanceRes.status === 403) {
+          localStorage.removeItem('user');
+          navigate('/login');
+          return;
+        }
         const usersData = usersRes.ok ? await usersRes.json() : [];
         const inventoryData = inventoryRes.ok ? await inventoryRes.json() : [];
         const maintenanceData = maintenanceRes.ok ? await maintenanceRes.json() : [];
@@ -87,7 +93,7 @@ const Admin = () => {
               <div className="card-body">
                 <i className="bi bi-people display-5 text-primary mb-2"></i>
                 <h5>Users</h5>
-                <p className="fs-3 fw-bold">{loading ? '...' : (typeof users.length === 'number' ? users.length : 0)}</p>
+                <p className="fs-3 fw-bold">{loading ? 'Loading...' : (typeof users.length === 'number' ? users.length : 0)}</p>
               </div>
             </div>
           </div>
@@ -96,7 +102,7 @@ const Admin = () => {
               <div className="card-body">
                 <i className="bi bi-box-seam display-5 text-success mb-2"></i>
                 <h5>Devices</h5>
-                <p className="fs-3 fw-bold">{loading ? '...' : (typeof inventory.length === 'number' ? inventory.length : 0)}</p>
+                <p className="fs-3 fw-bold">{loading ? 'Loading...' : (typeof inventory.length === 'number' ? inventory.length : 0)}</p>
               </div>
             </div>
           </div>
@@ -105,25 +111,31 @@ const Admin = () => {
               <div className="card-body">
                 <i className="bi bi-tools display-5 text-warning mb-2"></i>
                 <h5>Maintenance</h5>
-                <p className="fs-3 fw-bold">{loading ? '...' : (typeof maintenance.length === 'number' ? maintenance.length : 0)}</p>
+                <p className="fs-3 fw-bold">{loading ? 'Loading...' : (typeof maintenance.length === 'number' ? maintenance.length : 0)}</p>
               </div>
             </div>
           </div>
         </div>
+        {/* Error message if no data */}
+        {(!loading && users.length === 0 && inventory.length === 0 && maintenance.length === 0) && (
+          <div className="alert alert-warning text-center">No data found or you may not have access.</div>
+        )}
         {/* Features Grid */}
         <div className="row g-4">
           <div className="col-md-6">
             <div className="card shadow h-100">
               <div className="card-body">
                 <h4 className="fw-bold mb-2"><i className="bi bi-people text-primary"></i> Manage Users</h4>
-                <table className="table table-sm table-bordered">
-                  <thead><tr><th>Username</th><th>Role</th></tr></thead>
-                  <tbody>
-                    {users.map(u => (
-                      <tr key={u.id}><td>{u.username}</td><td>{u.role}</td></tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="table-responsive">
+                  <table className="table table-sm table-bordered">
+                    <thead><tr><th>Username</th><th>Role</th></tr></thead>
+                    <tbody>
+                      {users.map(u => (
+                        <tr key={u.id}><td>{u.username}</td><td>{u.role}</td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
                 <Link to="/register" className="btn btn-primary btn-sm">Add User</Link>
               </div>
             </div>
@@ -132,22 +144,24 @@ const Admin = () => {
             <div className="card shadow h-100">
               <div className="card-body">
                 <h4 className="fw-bold mb-2"><i className="bi bi-box-seam text-success"></i> Devices</h4>
-                <table className="table table-sm table-bordered">
-                  <thead><tr><th>Asset No</th><th>Asset Type</th><th>Serial No</th><th>Manufacturer</th><th>Model</th><th>Version</th><th>Status</th></tr></thead>
-                  <tbody>
-                    {inventory.map(d => (
-                      <tr key={d.id}>
-                        <td>{d.asset_no}</td>
-                        <td>{d.asset_type}</td>
-                        <td>{d.serial_no}</td>
-                        <td>{d.manufacturer}</td>
-                        <td>{d.model}</td>
-                        <td>{d.version}</td>
-                        <td>{d.status}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="table-responsive">
+                  <table className="table table-sm table-bordered">
+                    <thead><tr><th>Asset No</th><th>Asset Type</th><th>Serial No</th><th>Manufacturer</th><th>Model</th><th>Version</th><th>Status</th></tr></thead>
+                    <tbody>
+                      {inventory.map(d => (
+                        <tr key={d.id}>
+                          <td>{d.asset_no}</td>
+                          <td>{d.asset_type}</td>
+                          <td>{d.serial_no}</td>
+                          <td>{d.manufacturer}</td>
+                          <td>{d.model}</td>
+                          <td>{d.version}</td>
+                          <td>{d.status}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
                 <Link to="/inventory" className="btn btn-success btn-sm">Add/View Devices</Link>
               </div>
             </div>
@@ -156,14 +170,16 @@ const Admin = () => {
             <div className="card shadow h-100">
               <div className="card-body">
                 <h4 className="fw-bold mb-2"><i className="bi bi-tools text-warning"></i> Maintenance</h4>
-                <table className="table table-sm table-bordered">
-                  <thead><tr><th>Date</th><th>Equipment</th><th>User</th></tr></thead>
-                  <tbody>
-                    {maintenance.map(m => (
-                      <tr key={m.id}><td>{m.date}</td><td>{m.equipment}</td><td>{m.user}</td></tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="table-responsive">
+                  <table className="table table-sm table-bordered">
+                    <thead><tr><th>Date</th><th>Equipment</th><th>User</th></tr></thead>
+                    <tbody>
+                      {maintenance.map(m => (
+                        <tr key={m.id}><td>{m.date}</td><td>{m.equipment}</td><td>{m.user}</td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
                 <Link to="/maintenance" className="btn btn-warning btn-sm">Add/View Maintenance</Link>
               </div>
             </div>

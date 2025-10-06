@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './App.css';
@@ -36,8 +36,6 @@ function ReportsMessageWrapper() {
 function isLoggedIn() {
   return !!localStorage.getItem('user');
 }
-
-import { useEffect } from 'react';
 
 function ProtectedRoute({ element, adminOnly }) {
   const navigate = useNavigate();
@@ -116,20 +114,33 @@ function App() {
     currentUser = JSON.parse(localStorage.getItem('user'));
   } catch {}
 
+  // Logout handler
+  async function handleLogout() {
+    try {
+      await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+    } catch {}
+    localStorage.removeItem('user');
+    window.location.href = '/login';
+  }
+
   return (
     <Router>
       <div className="app-flex-layout d-flex flex-column min-vh-100">
         {/* Navigation Bar */}
-        <nav className="navbar navbar-expand-lg navbar-dark mwalimu-navbar shadow">
+        <nav className="navbar navbar-expand-md navbar-dark mwalimu-navbar shadow">
           <div className="container-fluid position-relative">
             {/* Brand left with logo */}
             <Link className="navbar-brand d-flex align-items-center me-3" to="/">
               <img src={mwalimuLogo} alt="Mwalimu Sacco Logo" style={{height: '40px', marginRight: '10px', borderRadius: '8px', background: 'rgba(27,94,32,0.9)', padding: '4px', border: '2px solid #fbc02d'}} />
               <span className="fw-bold fs-2" style={{color: '#fbc02d'}}>MWALIMU ICT</span>
             </Link>
-            {/* Absolutely centered nav links */}
-            <div style={{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-50%)',zIndex:2}}>
-              <ul className="navbar-nav flex-row gap-4">
+            {/* Responsive navbar toggler */}
+            <button className="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar" aria-controls="mainNavbar" aria-expanded="false" aria-label="Toggle navigation">
+              <span className="navbar-toggler-icon"></span>
+            </button>
+            {/* Navbar links */}
+            <div className="collapse navbar-collapse justify-content-center" id="mainNavbar">
+              <ul className="navbar-nav gap-2">
                 <li className="nav-item">
                   <Link className="nav-link" to="/">Home</Link>
                 </li>
@@ -154,7 +165,7 @@ function App() {
               {isLoggedIn() ? (
                 <div className="d-flex align-items-center gap-2">
                   <span className="text-light fw-bold"><i className="bi bi-person-circle me-1"></i>{currentUser?.username}</span>
-                  <button className="btn btn-outline-light" onClick={() => { localStorage.removeItem('user'); window.location.reload(); }}>Logout</button>
+                  <button className="btn btn-outline-light" onClick={handleLogout}>Logout</button>
                 </div>
               ) : (
                 <Dropdown>

@@ -1,13 +1,12 @@
-
-
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 
 const Register = () => {
   const [form, setForm] = useState({ username: '', password: '' });
   const [message, setMessage] = useState('');
   const [success, setSuccess] = useState(false);
+  const navigate = useNavigate();
 
   const handleChange = e => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -26,8 +25,10 @@ const Register = () => {
       const data = await res.json();
       if (res.ok) {
         setSuccess(true);
-        setMessage('Registration successful! You can now log in.');
-        setForm({ username: '', password: '' });
+        setMessage('Registration successful! Redirecting to login...');
+        setTimeout(() => {
+          navigate('/login');
+        }, 1200);
       } else {
         setMessage(data.error || 'Registration failed.');
       }
@@ -44,7 +45,7 @@ const Register = () => {
         <div className="text-center mb-4">
           <i className="bi bi-person-plus-fill display-3 text-warning mb-2"></i>
           <h2 className="fw-bold mb-1" style={{color: '#fbc02d'}}>Register</h2>
-          <p className="text-muted">Create your MWALIMU Towers ICT account</p>
+          <p className="text-muted">Create your MWALIMU ICT account</p>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
