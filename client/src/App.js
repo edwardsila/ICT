@@ -1,16 +1,61 @@
-
 import React from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './App.css';
 import { Dropdown } from 'react-bootstrap';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import Inventory from './pages/Inventory';
 import Maintenance from './pages/Maintenance';
 import Reports from './pages/Reports';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Users from './pages/Users';
+import Settings from './pages/Settings';
+
+// Wrapper for Reports page to show message for non-admins
+function ReportsMessageWrapper() {
+  let currentUser = null;
+  try {
+    currentUser = JSON.parse(localStorage.getItem('user'));
+  } catch (e) {
+    currentUser = null;
+  }
+  if (currentUser && currentUser.role !== 'admin') {
+    return (
+      <div className="container py-5 text-center">
+        <div className="alert alert-danger">You must be an admin to view reports.</div>
+      </div>
+    );
+  }
+  return <Reports />;
+}
+
+
+// Auth utility
+function isLoggedIn() {
+  return !!localStorage.getItem('user');
+}
+
+import { useEffect } from 'react';
+
+function ProtectedRoute({ element, adminOnly }) {
+  const navigate = useNavigate();
+  let currentUser = null;
+  try {
+    currentUser = JSON.parse(localStorage.getItem('user'));
+  } catch {}
+  useEffect(() => {
+    if (!isLoggedIn()) {
+      navigate('/login', { replace: true });
+    } else if (adminOnly && currentUser?.role !== 'admin') {
+      navigate('/');
+    }
+  }, [navigate, adminOnly]);
+  if (!isLoggedIn()) return null;
+  if (adminOnly && currentUser?.role !== 'admin') return null;
+  return element;
+}
 
 
 // MWALIMU National Sacco logo
@@ -65,66 +110,91 @@ function ModernHome() {
 }
 
 function App() {
+  // Get current user
+  let currentUser = null;
+  try {
+    currentUser = JSON.parse(localStorage.getItem('user'));
+  } catch {}
+
   return (
     <Router>
-      {/* Navigation Bar */}
-      <nav className="navbar navbar-expand-lg navbar-dark mwalimu-navbar shadow">
-        <div className="container-fluid position-relative">
-          {/* Brand left with logo */}
-          <Link className="navbar-brand d-flex align-items-center me-3" to="/">
-            <img src={mwalimuLogo} alt="Mwalimu Sacco Logo" style={{height: '40px', marginRight: '10px', borderRadius: '8px', background: 'rgba(27,94,32,0.9)', padding: '4px', border: '2px solid #fbc02d'}} />
-            <span className="fw-bold fs-2" style={{color: '#fbc02d'}}>MWALIMU ICT</span>
-          </Link>
-          {/* Absolutely centered nav links */}
-          <div style={{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-50%)',zIndex:2}}>
-            <ul className="navbar-nav flex-row gap-4">
-              <li className="nav-item">
-                <Link className="nav-link" to="/">Home</Link>
-              </li>
-              <li className="nav-item">
-                <Link className="nav-link" to="/inventory">Inventory</Link>
-              </li>
-              <li className="nav-item">
-                <Link className="nav-link" to="/maintenance">Maintenance</Link>
-              </li>
-              <li className="nav-item">
-                <Link className="nav-link" to="/reports">Reports</Link>
-              </li>
-            </ul>
+      <div className="app-flex-layout d-flex flex-column min-vh-100">
+        {/* Navigation Bar */}
+        <nav className="navbar navbar-expand-lg navbar-dark mwalimu-navbar shadow">
+          <div className="container-fluid position-relative">
+            {/* Brand left with logo */}
+            <Link className="navbar-brand d-flex align-items-center me-3" to="/">
+              <img src={mwalimuLogo} alt="Mwalimu Sacco Logo" style={{height: '40px', marginRight: '10px', borderRadius: '8px', background: 'rgba(27,94,32,0.9)', padding: '4px', border: '2px solid #fbc02d'}} />
+              <span className="fw-bold fs-2" style={{color: '#fbc02d'}}>MWALIMU ICT</span>
+            </Link>
+            {/* Absolutely centered nav links */}
+            <div style={{position:'absolute',left:'50%',top:'50%',transform:'translate(-50%,-50%)',zIndex:2}}>
+              <ul className="navbar-nav flex-row gap-4">
+                <li className="nav-item">
+                  <Link className="nav-link" to="/">Home</Link>
+                </li>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/inventory">Inventory</Link>
+                </li>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/maintenance">Maintenance</Link>
+                </li>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/reports">Reports</Link>
+                </li>
+                {currentUser?.role === 'admin' && (
+                  <li className="nav-item">
+                    <Link className="nav-link fw-bold text-warning" to="/admin"><i className="bi bi-speedometer2"></i> Dashboard</Link>
+                  </li>
+                )}
+              </ul>
+            </div>
+            {/* Account dropdown menu on the right */}
+            <div style={{position:'absolute',right:'0',top:'50%',transform:'translateY(-50%)',zIndex:2}}>
+              {isLoggedIn() ? (
+                <div className="d-flex align-items-center gap-2">
+                  <span className="text-light fw-bold"><i className="bi bi-person-circle me-1"></i>{currentUser?.username}</span>
+                  <button className="btn btn-outline-light" onClick={() => { localStorage.removeItem('user'); window.location.reload(); }}>Logout</button>
+                </div>
+              ) : (
+                <Dropdown>
+                  <Dropdown.Toggle variant="outline-light" id="dropdown-user">
+                    Account
+                  </Dropdown.Toggle>
+                  <Dropdown.Menu align="end">
+                    <Dropdown.Item as={Link} to="/admin">Admin</Dropdown.Item>
+                    <Dropdown.Item as={Link} to="/login">Login</Dropdown.Item>
+                    <Dropdown.Item as={Link} to="/register">Register</Dropdown.Item>
+                  </Dropdown.Menu>
+                </Dropdown>
+              )}
+            </div>
           </div>
-          {/* Account dropdown menu on the right */}
-          <div style={{position:'absolute',right:'0',top:'50%',transform:'translateY(-50%)',zIndex:2}}>
-            <Dropdown>
-              <Dropdown.Toggle variant="outline-light" id="dropdown-user">
-                Account
-              </Dropdown.Toggle>
-              <Dropdown.Menu align="end">
-                <Dropdown.Item as={Link} to="/admin">Admin</Dropdown.Item>
-                <Dropdown.Item as={Link} to="/login">Login</Dropdown.Item>
-                <Dropdown.Item as={Link} to="/register">Register</Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown>
+        </nav>
+
+        {/* Page Content */}
+        <div className="flex-grow-1">
+          <Routes>
+            <Route path="/" element={<ModernHome />} />
+            <Route path="/inventory" element={<ProtectedRoute element={<Inventory />} />} />
+            <Route path="/maintenance" element={<ProtectedRoute element={<Maintenance />} />} />
+            <Route path="/reports" element={<ProtectedRoute element={<ReportsMessageWrapper />} adminOnly={true} />} />
+            <Route path="/admin" element={<ProtectedRoute element={<Admin />} adminOnly={true} />} />
+            <Route path="/users" element={<ProtectedRoute element={<Users />} />} />
+            <Route path="/settings" element={<ProtectedRoute element={<Settings />} />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+
+          </Routes>
+        </div>
+
+        {/* Footer */}
+        <footer className="bg-dark text-light py-4 mt-auto">
+          <div className="container text-center">
+            <span>&copy; {new Date().getFullYear()} MWALIMU Towers ICT System. All rights reserved.</span>
           </div>
-        </div>
-      </nav>
-
-      {/* Page Content */}
-      <Routes>
-        <Route path="/" element={<ModernHome />} />
-        <Route path="/inventory" element={<Inventory />} />
-        <Route path="/maintenance" element={<Maintenance />} />
-        <Route path="/reports" element={<Reports />} />
-        <Route path="/admin" element={<Admin />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-      </Routes>
-
-      {/* Footer */}
-      <footer className="bg-dark text-light py-4 mt-5">
-        <div className="container text-center">
-          <span>&copy; {new Date().getFullYear()} MWALIMU Towers ICT System. All rights reserved.</span>
-        </div>
-      </footer>
+        </footer>
+      </div>
     </Router>
   );
 }

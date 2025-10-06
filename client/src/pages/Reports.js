@@ -11,18 +11,6 @@ const TIME_RANGES = [
   { value: 'month', label: 'Past Month' }
 ];
 
-function getDateRange(range) {
-  const now = new Date();
-  let start;
-  if (range === 'week') {
-    start = new Date(now);
-    start.setDate(now.getDate() - 7);
-  } else {
-    start = new Date(now);
-    start.setMonth(now.getMonth() - 1);
-  }
-  return { start, end: now };
-}
 
 const Reports = () => {
   const [reportType, setReportType] = useState('inventory');

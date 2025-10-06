@@ -30,7 +30,9 @@ const Login = () => {
         setMessage('Login successful!');
         // Store user info (simple localStorage for now)
         localStorage.setItem('user', JSON.stringify(data));
-        setTimeout(() => navigate('/'), 1000);
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 800);
       } else {
         setMessage(data.error || 'Login failed.');
       }
@@ -70,6 +72,10 @@ const Login = () => {
             <div className={`alert mt-3 ${success ? 'alert-success' : 'alert-danger'}`}>{message}</div>
           )}
         </form>
+        <div className="text-center mt-3">
+          <span>Don't have an account? </span>
+          <Link to="/register" className="btn btn-link text-primary p-0">Register</Link>
+        </div>
       </div>
     </div>
   );

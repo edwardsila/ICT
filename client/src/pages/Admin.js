@@ -1,6 +1,7 @@
 import React from 'react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import 'bootstrap-icons/font/bootstrap-icons.css';
 const Admin = () => {
   const [users, setUsers] = useState([]);
   const [inventory, setInventory] = useState([]);
@@ -9,6 +10,7 @@ const Admin = () => {
   const [accessDenied, setAccessDenied] = useState(false);
   const [reportType, setReportType] = useState('inventory');
   const [reportData, setReportData] = useState([]);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
@@ -20,14 +22,23 @@ const Admin = () => {
     }
     async function fetchData() {
       setLoading(true);
-      const [usersRes, inventoryRes, maintenanceRes] = await Promise.all([
-        fetch('/api/users'),
-        fetch('/api/inventory'),
-        fetch('/api/maintenance')
-      ]);
-      setUsers(await usersRes.json());
-      setInventory(await inventoryRes.json());
-      setMaintenance(await maintenanceRes.json());
+      try {
+        const [usersRes, inventoryRes, maintenanceRes] = await Promise.all([
+          fetch('/api/users'),
+          fetch('/api/inventory'),
+          fetch('/api/maintenance')
+        ]);
+        const usersData = usersRes.ok ? await usersRes.json() : [];
+        const inventoryData = inventoryRes.ok ? await inventoryRes.json() : [];
+        const maintenanceData = maintenanceRes.ok ? await maintenanceRes.json() : [];
+        setUsers(Array.isArray(usersData) ? usersData : []);
+        setInventory(Array.isArray(inventoryData) ? inventoryData : []);
+        setMaintenance(Array.isArray(maintenanceData) ? maintenanceData : []);
+      } catch (err) {
+        setUsers([]);
+        setInventory([]);
+        setMaintenance([]);
+      }
       setLoading(false);
     }
     fetchData();
@@ -51,126 +62,155 @@ const Admin = () => {
   };
 
   return (
-    <div className="container py-5">
-      <div className="mb-3">
-        <Link to="/" className="btn btn-outline-secondary"><i className="bi bi-arrow-left"></i> Back to Home</Link>
-      </div>
-      <h2 className="fw-bold mb-4 text-center" style={{color:'#1b5e20'}}>Admin Dashboard</h2>
-      {/* Summary Bar */}
-      <div className="row mb-4 justify-content-center">
-        <div className="col-md-4">
-          <div className="card shadow text-center">
-            <div className="card-body">
-              <i className="bi bi-people display-5 text-primary mb-2"></i>
-              <h5>Users</h5>
-              <p className="fs-3 fw-bold">{loading ? '...' : users.length}</p>
-            </div>
-          </div>
+    <div className="admin-dashboard d-flex" style={{minHeight:'100vh',background:'#f7f9fa'}}>
+      {/* Sidebar */}
+      <nav className={`sidebar bg-white shadow-sm ${sidebarOpen ? 'sidebar-open' : 'sidebar-collapsed'}`} style={{width:sidebarOpen?'220px':'60px',transition:'width 0.2s'}}>
+        <div className="d-flex flex-column align-items-center py-3">
+          <button className="btn btn-light mb-4" onClick={()=>setSidebarOpen(!sidebarOpen)} title="Toggle Sidebar">
+            <i className={`bi ${sidebarOpen?'bi-chevron-left':'bi-chevron-right'}`}></i>
+          </button>
+          <Link to="/admin" className="mb-3"><i className="bi bi-speedometer2 fs-4"></i>{sidebarOpen && <span className="ms-2">Dashboard</span>}</Link>
+          <Link to="/inventory" className="mb-3"><i className="bi bi-box-seam fs-4"></i>{sidebarOpen && <span className="ms-2">Inventory</span>}</Link>
+          <Link to="/maintenance" className="mb-3"><i className="bi bi-tools fs-4"></i>{sidebarOpen && <span className="ms-2">Maintenance</span>}</Link>
+          <Link to="/reports" className="mb-3"><i className="bi bi-bar-chart-line fs-4"></i>{sidebarOpen && <span className="ms-2">Reports</span>}</Link>
+          <Link to="/users" className="mb-3"><i className="bi bi-people fs-4"></i>{sidebarOpen && <span className="ms-2">Users</span>}</Link>
+          <Link to="/settings" className="mb-3"><i className="bi bi-gear fs-4"></i>{sidebarOpen && <span className="ms-2">Settings</span>}</Link>
         </div>
-        <div className="col-md-4">
-          <div className="card shadow text-center">
-            <div className="card-body">
-              <i className="bi bi-box-seam display-5 text-success mb-2"></i>
-              <h5>Devices</h5>
-              <p className="fs-3 fw-bold">{loading ? '...' : inventory.length}</p>
-            </div>
-          </div>
-        </div>
-        <div className="col-md-4">
-          <div className="card shadow text-center">
-            <div className="card-body">
-              <i className="bi bi-tools display-5 text-warning mb-2"></i>
-              <h5>Maintenance</h5>
-              <p className="fs-3 fw-bold">{loading ? '...' : maintenance.length}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Responsive grid for features */}
-      <div className="row g-4">
-        <div className="col-md-6">
-          <div className="card shadow h-100">
-            <div className="card-body">
-              <h4 className="fw-bold mb-2"><i className="bi bi-people text-primary"></i> Manage Users</h4>
-              <table className="table table-sm table-bordered">
-                <thead><tr><th>Username</th><th>Role</th></tr></thead>
-                <tbody>
-                  {users.map(u => (
-                    <tr key={u.id}><td>{u.username}</td><td>{u.role}</td></tr>
-                  ))}
-                </tbody>
-              </table>
-              <Link to="/register" className="btn btn-primary btn-sm">Add User</Link>
-            </div>
-          </div>
-        </div>
-        <div className="col-md-6">
-          <div className="card shadow h-100">
-            <div className="card-body">
-              <h4 className="fw-bold mb-2"><i className="bi bi-box-seam text-success"></i> Devices</h4>
-              <table className="table table-sm table-bordered">
-                <thead><tr><th>Name</th><th>Type</th><th>Status</th></tr></thead>
-                <tbody>
-                  {inventory.map(d => (
-                    <tr key={d.id}><td>{d.item_name}</td><td>{d.item_type}</td><td>{d.status}</td></tr>
-                  ))}
-                </tbody>
-              </table>
-              <Link to="/inventory" className="btn btn-success btn-sm">Add/View Devices</Link>
-            </div>
-          </div>
-        </div>
-        <div className="col-md-6">
-          <div className="card shadow h-100">
-            <div className="card-body">
-              <h4 className="fw-bold mb-2"><i className="bi bi-tools text-warning"></i> Maintenance</h4>
-              <table className="table table-sm table-bordered">
-                <thead><tr><th>Date</th><th>Equipment</th><th>User</th></tr></thead>
-                <tbody>
-                  {maintenance.map(m => (
-                    <tr key={m.id}><td>{m.date}</td><td>{m.equipment}</td><td>{m.user}</td></tr>
-                  ))}
-                </tbody>
-              </table>
-              <Link to="/maintenance" className="btn btn-warning btn-sm">Add/View Maintenance</Link>
-            </div>
-          </div>
-        </div>
-        <div className="col-md-6">
-          <div className="card shadow h-100">
-            <div className="card-body">
-              <h4 className="fw-bold mb-2"><i className="bi bi-bar-chart-line text-info"></i> Reports</h4>
-              <div className="mb-2">
-                <select className="form-select form-select-sm w-50 d-inline" value={reportType} onChange={e=>setReportType(e.target.value)}>
-                  <option value="inventory">Inventory</option>
-                  <option value="maintenance">Maintenance</option>
-                  <option value="users">Users</option>
-                </select>
-                <button className="btn btn-info btn-sm ms-2" onClick={handleReport}>Generate</button>
+      </nav>
+      {/* Main Content */}
+      <div className="flex-grow-1 p-4">
+        <h2 className="fw-bold mb-4 text-center" style={{color:'#1b5e20'}}>Admin Dashboard</h2>
+        {/* Card Metrics */}
+        <div className="row mb-4 justify-content-center">
+          <div className="col-md-4 mb-3">
+            <div className="card shadow text-center">
+              <div className="card-body">
+                <i className="bi bi-people display-5 text-primary mb-2"></i>
+                <h5>Users</h5>
+                <p className="fs-3 fw-bold">{loading ? '...' : (typeof users.length === 'number' ? users.length : 0)}</p>
               </div>
-              {reportData.length > 0 && (
-                <div style={{maxHeight:'200px',overflowY:'auto'}}>
-                  <table className="table table-sm table-bordered">
-                    <thead>
-                      <tr>
-                        {reportType==='inventory' && <><th>Name</th><th>Type</th><th>Status</th></>}
-                        {reportType==='maintenance' && <><th>Date</th><th>Equipment</th><th>User</th></>}
-                        {reportType==='users' && <><th>Username</th><th>Role</th></>}
+            </div>
+          </div>
+          <div className="col-md-4 mb-3">
+            <div className="card shadow text-center">
+              <div className="card-body">
+                <i className="bi bi-box-seam display-5 text-success mb-2"></i>
+                <h5>Devices</h5>
+                <p className="fs-3 fw-bold">{loading ? '...' : (typeof inventory.length === 'number' ? inventory.length : 0)}</p>
+              </div>
+            </div>
+          </div>
+          <div className="col-md-4 mb-3">
+            <div className="card shadow text-center">
+              <div className="card-body">
+                <i className="bi bi-tools display-5 text-warning mb-2"></i>
+                <h5>Maintenance</h5>
+                <p className="fs-3 fw-bold">{loading ? '...' : (typeof maintenance.length === 'number' ? maintenance.length : 0)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        {/* Features Grid */}
+        <div className="row g-4">
+          <div className="col-md-6">
+            <div className="card shadow h-100">
+              <div className="card-body">
+                <h4 className="fw-bold mb-2"><i className="bi bi-people text-primary"></i> Manage Users</h4>
+                <table className="table table-sm table-bordered">
+                  <thead><tr><th>Username</th><th>Role</th></tr></thead>
+                  <tbody>
+                    {users.map(u => (
+                      <tr key={u.id}><td>{u.username}</td><td>{u.role}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+                <Link to="/register" className="btn btn-primary btn-sm">Add User</Link>
+              </div>
+            </div>
+          </div>
+          <div className="col-md-6">
+            <div className="card shadow h-100">
+              <div className="card-body">
+                <h4 className="fw-bold mb-2"><i className="bi bi-box-seam text-success"></i> Devices</h4>
+                <table className="table table-sm table-bordered">
+                  <thead><tr><th>Asset No</th><th>Asset Type</th><th>Serial No</th><th>Manufacturer</th><th>Model</th><th>Version</th><th>Status</th></tr></thead>
+                  <tbody>
+                    {inventory.map(d => (
+                      <tr key={d.id}>
+                        <td>{d.asset_no}</td>
+                        <td>{d.asset_type}</td>
+                        <td>{d.serial_no}</td>
+                        <td>{d.manufacturer}</td>
+                        <td>{d.model}</td>
+                        <td>{d.version}</td>
+                        <td>{d.status}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {reportData.map((r,i) => (
-                        <tr key={i}>
-                          {reportType==='inventory' && <><td>{r.item_name}</td><td>{r.item_type}</td><td>{r.status}</td></>}
-                          {reportType==='maintenance' && <><td>{r.date}</td><td>{r.equipment}</td><td>{r.user}</td></>}
-                          {reportType==='users' && <><td>{r.username}</td><td>{r.role}</td></>}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                    ))}
+                  </tbody>
+                </table>
+                <Link to="/inventory" className="btn btn-success btn-sm">Add/View Devices</Link>
+              </div>
+            </div>
+          </div>
+          <div className="col-md-6">
+            <div className="card shadow h-100">
+              <div className="card-body">
+                <h4 className="fw-bold mb-2"><i className="bi bi-tools text-warning"></i> Maintenance</h4>
+                <table className="table table-sm table-bordered">
+                  <thead><tr><th>Date</th><th>Equipment</th><th>User</th></tr></thead>
+                  <tbody>
+                    {maintenance.map(m => (
+                      <tr key={m.id}><td>{m.date}</td><td>{m.equipment}</td><td>{m.user}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+                <Link to="/maintenance" className="btn btn-warning btn-sm">Add/View Maintenance</Link>
+              </div>
+            </div>
+          </div>
+          <div className="col-md-6">
+            <div className="card shadow h-100">
+              <div className="card-body">
+                <h4 className="fw-bold mb-2"><i className="bi bi-bar-chart-line text-info"></i> Reports</h4>
+                <div className="mb-2">
+                  <select className="form-select form-select-sm w-50 d-inline" value={reportType} onChange={e=>setReportType(e.target.value)}>
+                    <option value="inventory">Inventory</option>
+                    <option value="maintenance">Maintenance</option>
+                    <option value="users">Users</option>
+                  </select>
+                  <button className="btn btn-info btn-sm ms-2" onClick={handleReport}>Generate</button>
                 </div>
-              )}
+                {reportData.length > 0 && (
+                  <div style={{maxHeight:'200px',overflowY:'auto'}}>
+                    <table className="table table-sm table-bordered">
+                      <thead>
+                        <tr>
+                          {reportType==='inventory' && <><th>Asset No</th><th>Asset Type</th><th>Serial No</th><th>Manufacturer</th><th>Model</th><th>Version</th><th>Status</th></>}
+                          {reportType==='maintenance' && <><th>Date</th><th>Equipment</th><th>User</th></>}
+                          {reportType==='users' && <><th>Username</th><th>Role</th></>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reportData.map((r,i) => (
+                          <tr key={i}>
+                            {reportType==='inventory' && <>
+                              <td>{r.asset_no}</td>
+                              <td>{r.asset_type}</td>
+                              <td>{r.serial_no}</td>
+                              <td>{r.manufacturer}</td>
+                              <td>{r.model}</td>
+                              <td>{r.version}</td>
+                              <td>{r.status}</td>
+                            </>}
+                            {reportType==='maintenance' && <><td>{r.date}</td><td>{r.equipment}</td><td>{r.user}</td></>}
+                            {reportType==='users' && <><td>{r.username}</td><td>{r.role}</td></>}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
