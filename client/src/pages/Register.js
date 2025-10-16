@@ -16,6 +16,7 @@ const Register = () => {
     e.preventDefault();
     setMessage('');
     setSuccess(false);
+    console.log('Submitting registration form:', form);
     try {
       const res = await fetch('/api/register', {
         method: 'POST',

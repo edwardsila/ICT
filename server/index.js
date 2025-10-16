@@ -2,7 +2,7 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const SALT_ROUNDS = 10;
-const { Pool } = require('pg');
+const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
 const path = require('path');
 
@@ -26,40 +26,49 @@ app.use(session({
 }));
 app.use(express.static(path.join(__dirname, '../client/build')));
 
-// PostgreSQL setup
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
+// SQLite setup
+const dbPath = path.join(__dirname, 'ict_inventory.db');
+const db = new sqlite3.Database(dbPath, (err) => {
+  if (err) {
+    console.error('Error opening database:', err.message);
+  } else {
+    console.log('Connected to SQLite database.');
+  }
+});
+
+// Ensure the server starts
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
 
 // Create tables if they don't exist
 const createTables = () => {
-  pool.query(`CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY,
-    username VARCHAR(50) UNIQUE NOT NULL,
+  db.run(`CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
-    role VARCHAR(20) DEFAULT 'user'
+    role TEXT DEFAULT 'user'
   )`);
 
-  pool.query(`CREATE TABLE IF NOT EXISTS inventory (
-    id SERIAL PRIMARY KEY,
-    asset_no VARCHAR(50) NOT NULL,
-    asset_type VARCHAR(50) NOT NULL,
-    serial_no VARCHAR(50),
-    manufacturer VARCHAR(50),
-    model VARCHAR(50),
-    version VARCHAR(50),
-    status VARCHAR(20) NOT NULL
+  db.run(`CREATE TABLE IF NOT EXISTS inventory (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    asset_no TEXT NOT NULL,
+    asset_type TEXT NOT NULL,
+    serial_no TEXT,
+    manufacturer TEXT,
+    model TEXT,
+    version TEXT,
+    status TEXT NOT NULL
   )`);
 
-  pool.query(`CREATE TABLE IF NOT EXISTS maintenance (
-    id SERIAL PRIMARY KEY,
-    date VARCHAR(20) NOT NULL,
-    equipment VARCHAR(50) NOT NULL,
-    tagnumber VARCHAR(50) NOT NULL,
-    department VARCHAR(50) NOT NULL,
-    equipment_model VARCHAR(50) NOT NULL,
-    "user" VARCHAR(50) NOT NULL
+  db.run(`CREATE TABLE IF NOT EXISTS maintenance (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT NOT NULL,
+    equipment TEXT NOT NULL,
+    tagnumber TEXT NOT NULL,
+    department TEXT NOT NULL,
+    equipment_model TEXT NOT NULL,
+    user TEXT NOT NULL
   )`);
 };
 
@@ -79,6 +88,7 @@ function isValidPassword(val) {
 // User registration
 app.post('/api/register', async (req, res) => {
   const { username, password, role } = req.body;
+  console.log('Register request body:', req.body);
   // Username: 3-20 chars, alphanumeric only
   if (!username || typeof username !== 'string' || !/^[a-zA-Z0-9]{3,20}$/.test(username)) {
     return res.status(400).json({ error: 'Username must be 3-20 alphanumeric characters' });
@@ -87,19 +97,30 @@ app.post('/api/register', async (req, res) => {
   if (!password || typeof password !== 'string' || password.length < 6 || password.length > 50) {
     return res.status(400).json({ error: 'Password must be 6-50 characters' });
   }
-  try {
-    const hash = await bcrypt.hash(password, SALT_ROUNDS);
-    const result = await pool.query(
-      'INSERT INTO users (username, password, role) VALUES ($1, $2, $3) RETURNING id, username, role',
-      [username, hash, role || 'user']
-    );
-    res.json(result.rows[0]);
-  } catch (err) {
-    if (err.code === '23505') { // unique_violation
-      return res.status(400).json({ error: 'Username already exists' });
+  const hash = await bcrypt.hash(password, SALT_ROUNDS);
+  console.log('Password hash:', hash);
+  db.run(
+    'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
+    [username, hash, role || 'user'],
+    function(err) {
+      if (err) {
+        console.error('Registration DB error:', err);
+        if (err.message && err.message.includes('UNIQUE')) {
+          return res.status(400).json({ error: 'Username already exists' });
+        }
+        return res.status(500).json({ error: 'Registration failed' });
+      }
+      // Log the inserted user id
+      console.log('Inserted user id:', this.lastID);
+      db.get('SELECT id, username, role FROM users WHERE id = ?', [this.lastID], (err2, row) => {
+        if (err2) {
+          console.error('Fetch after insert error:', err2);
+          return res.status(500).json({ error: 'Registration failed' });
+        }
+        res.json(row);
+      });
     }
-    return res.status(500).json({ error: 'Registration failed' });
-  }
+  );
 });
 
 // User login (simple, no JWT yet)
@@ -111,65 +132,85 @@ app.post('/api/login', async (req, res) => {
   if (!password || typeof password !== 'string' || password.length < 6 || password.length > 50) {
     return res.status(400).json({ error: 'Invalid password format' });
   }
-  try {
-    const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
-    const user = result.rows[0];
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-    req.session.user = { id: user.id, username: user.username, role: user.role };
-    res.json({ id: user.id, username: user.username, role: user.role });
-  } catch {
-    return res.status(500).json({ error: 'Login failed' });
-  }
-});
+  // LOGIN HANDLER
+try {
+  const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+  const user = result.rows[0];
 
-// Middleware to require login
-function requireLogin(req, res, next) {
-  if (!req.session.user) {
-    return res.status(401).json({ error: 'Login required' });
+  if (!user) {
+    return res.status(401).json({ error: 'Invalid credentials' });
   }
-  next();
+
+  const match = await bcrypt.compare(password, user.password);
+  if (!match) {
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
+
+  req.session.user = { id: user.id, username: user.username, role: user.role };
+  res.json({ id: user.id, username: user.username, role: user.role });
+
+} catch (err) {
+  console.error('Login error:', err);
+  return res.status(500).json({ error: 'Login failed' });
 }
 
-// Middleware to check admin role
-function requireAdmin(req, res, next) {
-  if (!req.session.user || req.session.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin access required' });
-  }
-  next();
-}
 
+// REGISTRATION HANDLER
+try {
+  const hash = await bcrypt.hash(password, SALT_ROUNDS);
+  console.log('Password hash:', hash);
+
+  db.run(
+    'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
+    [username, hash, role || 'user'],
+    function (err) {
+      if (err) {
+        console.error('Registration DB error:', err);
+        if (err.message && err.message.includes('UNIQUE')) {
+          return res.status(400).json({ error: 'Username already exists' });
+        }
+        return res.status(500).json({ error: 'Registration failed' });
+      }
+
+      db.get('SELECT id, username, role FROM users WHERE id = ?', [this.lastID], (err2, row) => {
+        if (err2) {
+          console.error('Fetch after insert error:', err2);
+          return res.status(500).json({ error: 'Registration failed' });
+        }
+        res.json(row);
+      });
+    }
+  );
+
+} catch (err) {
+  console.error('Registration error:', err);
+  return res.status(500).json({ error: 'Registration failed' });
+}
 // Inventory CRUD
-app.get('/api/inventory', requireLogin, async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM inventory');
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+app.get('/api/inventory', requireLogin, (req, res) => {
+  db.all('SELECT * FROM inventory', [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(rows);
+  });
 });
 
-app.get('/api/inventory/:id', requireLogin, async (req, res) => {
+app.get('/api/inventory/:id', requireLogin, (req, res) => {
   const { id } = req.params;
   if (!id || isNaN(Number(id))) {
     return res.status(400).json({ error: 'Invalid inventory ID' });
   }
-  try {
-    const result = await pool.query('SELECT * FROM inventory WHERE id = $1', [id]);
-    const row = result.rows[0];
+  db.get('SELECT * FROM inventory WHERE id = ?', [id], (err, row) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
     if (!row) return res.status(404).json({ error: 'Item not found' });
     res.json(row);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  });
 });
 
-app.post('/api/inventory', requireLogin, async (req, res) => {
+app.post('/api/inventory', requireLogin, (req, res) => {
   const { asset_no, asset_type, serial_no, manufacturer, model, version, status } = req.body;
   if (!asset_no || typeof asset_no !== 'string' || asset_no.length < 1 || asset_no.length > 50) {
     return res.status(400).json({ error: 'Invalid asset_no' });
@@ -192,15 +233,16 @@ app.post('/api/inventory', requireLogin, async (req, res) => {
   if (!status || typeof status !== 'string' || status.length < 1 || status.length > 20) {
     return res.status(400).json({ error: 'Invalid status' });
   }
-  try {
-    const result = await pool.query(
-      'INSERT INTO inventory (asset_no, asset_type, serial_no, manufacturer, model, version, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-      [asset_no, asset_type, serial_no, manufacturer, model, version, status]
-    );
-    res.json({ id: result.rows[0].id });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
+  db.run(
+    'INSERT INTO inventory (asset_no, asset_type, serial_no, manufacturer, model, version, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [asset_no, asset_type, serial_no, manufacturer, model, version, status],
+    function(err) {
+      if (err) {
+        return res.status(400).json({ error: err.message });
+      }
+      res.json({ id: this.lastID });
+    }
+  );
 });
 
 app.put('/api/inventory/:id', requireLogin, async (req, res) => {
@@ -378,25 +420,27 @@ app.get('/api/users', requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/api/logout', requireLogin, (req, res) => {
-  req.session.destroy((err) => {
+app.post('/api/login', async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || typeof username !== 'string' || !/^[a-zA-Z0-9]{3,20}$/.test(username)) {
+    return res.status(400).json({ error: 'Invalid username format' });
+  }
+  if (!password || typeof password !== 'string' || password.length < 6 || password.length > 50) {
+    return res.status(400).json({ error: 'Invalid password format' });
+  }
+  db.get('SELECT * FROM users WHERE username = ?', [username], async (err, user) => {
     if (err) {
-      return res.status(500).json({ error: 'Logout failed' });
+      console.error('Login DB error:', err);
+      return res.status(500).json({ error: 'Login failed' });
     }
-    res.clearCookie('connect.sid');
-    res.json({ message: 'Logged out successfully' });
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    req.session.user = { id: user.id, username: user.username, role: user.role };
+    res.json({ id: user.id, username: user.username, role: user.role });
   });
-});
-
-app.get('/', (req, res) => {
-  res.send('ICT Inventory & Maintenance API running');
-});
-
-// Serve React frontend for all other routes
-app.use((req, res) => {
-  res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
-});
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
 });

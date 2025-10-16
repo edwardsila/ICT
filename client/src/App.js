@@ -128,18 +128,20 @@ function App() {
       <div className="app-flex-layout d-flex flex-column min-vh-100">
         {/* Navigation Bar */}
         <nav className="navbar navbar-expand-md navbar-dark mwalimu-navbar shadow">
-          <div className="container-fluid position-relative">
+          <div className="container-fluid d-flex align-items-center">
             {/* Brand left with logo */}
             <Link className="navbar-brand d-flex align-items-center me-3" to="/">
               <img src={mwalimuLogo} alt="Mwalimu Sacco Logo" style={{height: '40px', marginRight: '10px', borderRadius: '8px', background: 'rgba(27,94,32,0.9)', padding: '4px', border: '2px solid #fbc02d'}} />
               <span className="fw-bold fs-2" style={{color: '#fbc02d'}}>MWALIMU ICT</span>
             </Link>
+            {/* Spacer to push nav links right */}
+            <div className="flex-grow-1"></div>
             {/* Responsive navbar toggler */}
             <button className="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar" aria-controls="mainNavbar" aria-expanded="false" aria-label="Toggle navigation">
               <span className="navbar-toggler-icon"></span>
             </button>
-            {/* Navbar links */}
-            <div className="collapse navbar-collapse justify-content-center" id="mainNavbar">
+            {/* Navbar links and account dropdown right aligned */}
+            <div className="collapse navbar-collapse justify-content-end" id="mainNavbar">
               <ul className="navbar-nav gap-2">
                 <li className="nav-item">
                   <Link className="nav-link" to="/">Home</Link>
@@ -159,16 +161,14 @@ function App() {
                   </li>
                 )}
               </ul>
-            </div>
-            {/* Account dropdown menu on the right */}
-            <div style={{position:'absolute',right:'0',top:'50%',transform:'translateY(-50%)',zIndex:2}}>
+              {/* Account dropdown menu */}
               {isLoggedIn() ? (
-                <div className="d-flex align-items-center gap-2">
+                <div className="d-flex align-items-center gap-2 ms-3">
                   <span className="text-light fw-bold"><i className="bi bi-person-circle me-1"></i>{currentUser?.username}</span>
                   <button className="btn btn-outline-light" onClick={handleLogout}>Logout</button>
                 </div>
               ) : (
-                <Dropdown>
+                <Dropdown className="ms-3">
                   <Dropdown.Toggle variant="outline-light" id="dropdown-user">
                     Account
                   </Dropdown.Toggle>
