@@ -51,6 +51,33 @@ const createTables = () => {
   )`);
 
   db.run(`CREATE TABLE IF NOT EXISTS inventory (
+  
+      // Ensure additional columns exist for transfer lifecycle (safe to run on start)
+      const ensureTransferColumns = () => {
+        const alterStatements = [
+          "ALTER TABLE transfers ADD COLUMN destination TEXT",
+          "ALTER TABLE transfers ADD COLUMN records_received_by TEXT",
+          "ALTER TABLE transfers ADD COLUMN records_received_at TEXT",
+          "ALTER TABLE transfers ADD COLUMN records_notes TEXT",
+          "ALTER TABLE transfers ADD COLUMN shipped_by TEXT",
+          "ALTER TABLE transfers ADD COLUMN shipped_at TEXT",
+          "ALTER TABLE transfers ADD COLUMN tracking_info TEXT",
+          "ALTER TABLE transfers ADD COLUMN destination_received_by TEXT",
+          "ALTER TABLE transfers ADD COLUMN destination_received_at TEXT"
+        ];
+        alterStatements.forEach(sql => {
+          db.run(sql, [], err => {
+            if (err) {
+              // Ignore duplicate column errors; log others
+              if (!/duplicate column|already exists/i.test(err.message)) {
+                console.error('Error ensuring transfer columns:', err.message);
+              }
+            }
+          });
+        });
+      };
+  
+      ensureTransferColumns();
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     asset_no TEXT NOT NULL,
     asset_type TEXT NOT NULL,
@@ -58,7 +85,8 @@ const createTables = () => {
     manufacturer TEXT,
     model TEXT,
     version TEXT,
-    status TEXT NOT NULL
+    status TEXT NOT NULL,
+    department TEXT NOT NULL
   )`);
 
   db.run(`CREATE TABLE IF NOT EXISTS maintenance (
@@ -74,6 +102,23 @@ const createTables = () => {
 
 createTables();
 
+// Transfers table
+db.run(`CREATE TABLE IF NOT EXISTS transfers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  inventory_id INTEGER NOT NULL,
+  from_department TEXT NOT NULL,
+      const { destination } = req.body;
+      if (!destination || !isValidString(destination)) return res.status(400).json({ error: 'Invalid destination' });
+  to_department TEXT NOT NULL,
+  sent_by TEXT NOT NULL,
+  sent_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'Sent',
+  received_by TEXT,
+  received_at TEXT,
+  notes TEXT,
+  FOREIGN KEY (inventory_id) REFERENCES inventory(id)
+)`);
+
 // Helper validation functions
 function isValidString(val, min = 1, max = 50) {
   return typeof val === 'string' && val.length >= min && val.length <= max;
@@ -87,7 +132,7 @@ function isValidPassword(val) {
 
 // User registration
 app.post('/api/register', async (req, res) => {
-  const { username, password, role } = req.body;
+      db.run('UPDATE transfers SET status = ?, destination_received_by = ?, destination_received_at = ? WHERE id = ?', ['Delivered', received_by, received_at, id], function(err) {
   console.log('Register request body:', req.body);
   // Username: 3-20 chars, alphanumeric only
   if (!username || typeof username !== 'string' || !/^[a-zA-Z0-9]{3,20}$/.test(username)) {
@@ -97,30 +142,35 @@ app.post('/api/register', async (req, res) => {
   if (!password || typeof password !== 'string' || password.length < 6 || password.length > 50) {
     return res.status(400).json({ error: 'Password must be 6-50 characters' });
   }
-  const hash = await bcrypt.hash(password, SALT_ROUNDS);
-  console.log('Password hash:', hash);
-  db.run(
-    'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
-    [username, hash, role || 'user'],
-    function(err) {
+    bcrypt.hash(password, SALT_ROUNDS, (err, hash) => {
       if (err) {
-        console.error('Registration DB error:', err);
-        if (err.message && err.message.includes('UNIQUE')) {
-          return res.status(400).json({ error: 'Username already exists' });
-        }
+        console.error('Bcrypt hash error:', err);
         return res.status(500).json({ error: 'Registration failed' });
       }
-      // Log the inserted user id
-      console.log('Inserted user id:', this.lastID);
-      db.get('SELECT id, username, role FROM users WHERE id = ?', [this.lastID], (err2, row) => {
-        if (err2) {
-          console.error('Fetch after insert error:', err2);
-          return res.status(500).json({ error: 'Registration failed' });
+      console.log('Password hash:', hash);
+      db.run(
+        'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
+        [username, hash, role || 'user'],
+        function(err) {
+          if (err) {
+            console.error('Registration DB error:', err);
+            if (err.message && err.message.includes('UNIQUE')) {
+              return res.status(400).json({ error: 'Username already exists' });
+            }
+            return res.status(500).json({ error: 'Registration failed' });
+          }
+          // Log the inserted user id
+          console.log('Inserted user id:', this.lastID);
+          db.get('SELECT id, username, role FROM users WHERE id = ?', [this.lastID], (err2, row) => {
+            if (err2) {
+              console.error('Fetch after insert error:', err2);
+              return res.status(500).json({ error: 'Registration failed' });
+            }
+            res.json(row);
+          });
         }
-        res.json(row);
-      });
-    }
-  );
+      );
+});
 });
 
 // User login (simple, no JWT yet)
@@ -132,63 +182,44 @@ app.post('/api/login', async (req, res) => {
   if (!password || typeof password !== 'string' || password.length < 6 || password.length > 50) {
     return res.status(400).json({ error: 'Invalid password format' });
   }
-  // LOGIN HANDLER
-try {
-  const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
-  const user = result.rows[0];
-
-  if (!user) {
-    return res.status(401).json({ error: 'Invalid credentials' });
-  }
-
-  const match = await bcrypt.compare(password, user.password);
-  if (!match) {
-    return res.status(401).json({ error: 'Invalid credentials' });
-  }
-
-  req.session.user = { id: user.id, username: user.username, role: user.role };
-  res.json({ id: user.id, username: user.username, role: user.role });
-
-} catch (err) {
-  console.error('Login error:', err);
-  return res.status(500).json({ error: 'Login failed' });
-}
+  db.get('SELECT * FROM users WHERE username = ?', [username], async (err, user) => {
+    if (err) {
+      console.error('Login DB error:', err);
+      return res.status(500).json({ error: 'Login failed' });
+    }
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    req.session.user = { id: user.id, username: user.username, role: user.role };
+    res.json({ id: user.id, username: user.username, role: user.role });
+  });
+});
 
 
 // REGISTRATION HANDLER
-try {
-  const hash = await bcrypt.hash(password, SALT_ROUNDS);
-  console.log('Password hash:', hash);
 
-  db.run(
-    'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
-    [username, hash, role || 'user'],
-    function (err) {
-      if (err) {
-        console.error('Registration DB error:', err);
-        if (err.message && err.message.includes('UNIQUE')) {
-          return res.status(400).json({ error: 'Username already exists' });
-        }
-        return res.status(500).json({ error: 'Registration failed' });
-      }
-
-      db.get('SELECT id, username, role FROM users WHERE id = ?', [this.lastID], (err2, row) => {
-        if (err2) {
-          console.error('Fetch after insert error:', err2);
-          return res.status(500).json({ error: 'Registration failed' });
-        }
-        res.json(row);
-      });
-    }
-  );
-
-} catch (err) {
-  console.error('Registration error:', err);
-  return res.status(500).json({ error: 'Registration failed' });
+// Middleware to require login
+function requireLogin(req, res, next) {
+  if (!req.session || !req.session.user) {
+    return res.status(401).json({ error: 'Login required' });
+  }
+  next();
 }
+
 // Inventory CRUD
 app.get('/api/inventory', requireLogin, (req, res) => {
-  db.all('SELECT * FROM inventory', [], (err, rows) => {
+  const dept = req.query.department;
+  let sql = 'SELECT * FROM inventory';
+  let params = [];
+  if (dept) {
+    sql += ' WHERE department = ?';
+    params.push(dept);
+  }
+  db.all(sql, params, (err, rows) => {
     if (err) {
       return res.status(500).json({ error: err.message });
     }
@@ -211,7 +242,7 @@ app.get('/api/inventory/:id', requireLogin, (req, res) => {
 });
 
 app.post('/api/inventory', requireLogin, (req, res) => {
-  const { asset_no, asset_type, serial_no, manufacturer, model, version, status } = req.body;
+  const { asset_no, asset_type, serial_no, manufacturer, model, version, status, department } = req.body;
   if (!asset_no || typeof asset_no !== 'string' || asset_no.length < 1 || asset_no.length > 50) {
     return res.status(400).json({ error: 'Invalid asset_no' });
   }
@@ -233,9 +264,12 @@ app.post('/api/inventory', requireLogin, (req, res) => {
   if (!status || typeof status !== 'string' || status.length < 1 || status.length > 20) {
     return res.status(400).json({ error: 'Invalid status' });
   }
+  if (!department || typeof department !== 'string' || department.length < 1 || department.length > 50) {
+    return res.status(400).json({ error: 'Invalid department' });
+  }
   db.run(
-    'INSERT INTO inventory (asset_no, asset_type, serial_no, manufacturer, model, version, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [asset_no, asset_type, serial_no, manufacturer, model, version, status],
+    'INSERT INTO inventory (asset_no, asset_type, serial_no, manufacturer, model, version, status, department) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [asset_no, asset_type, serial_no, manufacturer, model, version, status, department],
     function(err) {
       if (err) {
         return res.status(400).json({ error: err.message });
@@ -272,15 +306,16 @@ app.put('/api/inventory/:id', requireLogin, async (req, res) => {
   if (!status || typeof status !== 'string' || status.length < 1 || status.length > 20) {
     return res.status(400).json({ error: 'Invalid status' });
   }
-  try {
-    const result = await pool.query(
-      'UPDATE inventory SET asset_no = $1, asset_type = $2, serial_no = $3, manufacturer = $4, model = $5, version = $6, status = $7 WHERE id = $8 RETURNING *',
-      [asset_no, asset_type, serial_no, manufacturer, model, version, status, id]
-    );
-    res.json({ updated: result.rowCount });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
+  db.run(
+    'UPDATE inventory SET asset_no = ?, asset_type = ?, serial_no = ?, manufacturer = ?, model = ?, version = ?, status = ? WHERE id = ?',
+    [asset_no, asset_type, serial_no, manufacturer, model, version, status, id],
+    function(err) {
+      if (err) {
+        return res.status(400).json({ error: err.message });
+      }
+      res.json({ updated: this.changes });
+    }
+  );
 });
 
 app.delete('/api/inventory/:id', requireLogin, async (req, res) => {
@@ -288,22 +323,22 @@ app.delete('/api/inventory/:id', requireLogin, async (req, res) => {
   if (!id || isNaN(Number(id))) {
     return res.status(400).json({ error: 'Invalid inventory ID' });
   }
-  try {
-    const result = await pool.query('DELETE FROM inventory WHERE id = $1', [id]);
-    res.json({ deleted: result.rowCount });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
+  db.run('DELETE FROM inventory WHERE id = ?', [id], function(err) {
+    if (err) {
+      return res.status(400).json({ error: err.message });
+    }
+    res.json({ deleted: this.changes });
+  });
 });
 
 // MAINTENANCE ENDPOINTS
 app.get('/api/maintenance', requireLogin, async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM maintenance');
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  db.all('SELECT * FROM maintenance', [], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    res.json(rows);
+  });
 });
 
 app.get('/api/maintenance/:id', requireLogin, async (req, res) => {
@@ -311,14 +346,13 @@ app.get('/api/maintenance/:id', requireLogin, async (req, res) => {
   if (!id || isNaN(Number(id))) {
     return res.status(400).json({ error: 'Invalid maintenance ID' });
   }
-  try {
-    const result = await pool.query('SELECT * FROM maintenance WHERE id = $1', [id]);
-    const row = result.rows[0];
+  db.get('SELECT * FROM maintenance WHERE id = ?', [id], (err, row) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
     if (!row) return res.status(404).json({ error: 'Record not found' });
     res.json(row);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  });
 });
 
 app.post('/api/maintenance', requireLogin, async (req, res) => {
@@ -341,15 +375,16 @@ app.post('/api/maintenance', requireLogin, async (req, res) => {
   if (!user || typeof user !== 'string' || user.length < 1 || user.length > 50) {
     return res.status(400).json({ error: 'Invalid user' });
   }
-  try {
-    const result = await pool.query(
-      'INSERT INTO maintenance (date, equipment, tagnumber, department, equipment_model, user) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [date, equipment, tagnumber, department, equipment_model, user]
-    );
-    res.json({ id: result.rows[0].id });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
+  db.run(
+    'INSERT INTO maintenance (date, equipment, tagnumber, department, equipment_model, user) VALUES (?, ?, ?, ?, ?, ?)',
+    [date, equipment, tagnumber, department, equipment_model, user],
+    function(err) {
+      if (err) {
+        return res.status(400).json({ error: err.message });
+      }
+      res.json({ id: this.lastID });
+    }
+  );
 });
 
 app.put('/api/maintenance/:id', requireLogin, async (req, res) => {
@@ -376,15 +411,16 @@ app.put('/api/maintenance/:id', requireLogin, async (req, res) => {
   if (!user || typeof user !== 'string' || user.length < 1 || user.length > 50) {
     return res.status(400).json({ error: 'Invalid user' });
   }
-  try {
-    const result = await pool.query(
-      'UPDATE maintenance SET date = $1, equipment = $2, tagnumber = $3, department = $4, equipment_model = $5, user = $6 WHERE id = $7 RETURNING *',
-      [date, equipment, tagnumber, department, equipment_model, user, id]
-    );
-    res.json({ updated: result.rowCount });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
+  db.run(
+    'UPDATE maintenance SET date = ?, equipment = ?, tagnumber = ?, department = ?, equipment_model = ?, user = ? WHERE id = ?',
+    [date, equipment, tagnumber, department, equipment_model, user, id],
+    function(err) {
+      if (err) {
+        return res.status(400).json({ error: err.message });
+      }
+      res.json({ updated: this.changes });
+    }
+  );
 });
 
 app.delete('/api/maintenance/:id', requireLogin, async (req, res) => {
@@ -392,55 +428,103 @@ app.delete('/api/maintenance/:id', requireLogin, async (req, res) => {
   if (!id || isNaN(Number(id))) {
     return res.status(400).json({ error: 'Invalid maintenance ID' });
   }
-  try {
-    const result = await pool.query('DELETE FROM maintenance WHERE id = $1', [id]);
-    res.json({ deleted: result.rowCount });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
+  db.run('DELETE FROM maintenance WHERE id = ?', [id], function(err) {
+    if (err) {
+      return res.status(400).json({ error: err.message });
+    }
+    res.json({ deleted: this.changes });
+  });
 });
 
 // Reports endpoint (protected)
-app.get('/api/reports', requireLogin, async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM inventory');
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
-// List users (for admin)
-app.get('/api/users', requireAdmin, async (req, res) => {
-  try {
-    const result = await pool.query('SELECT id, username, role FROM users');
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+// Inventory report endpoint
+app.get('/api/reports/inventory', requireLogin, (req, res) => {
+  const dept = req.query.department;
+  let sql = 'SELECT * FROM inventory';
+  let params = [];
+  if (dept && dept !== 'all') {
+    sql += ' WHERE department = ?';
+    params.push(dept);
   }
-});
-
-app.post('/api/login', async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || typeof username !== 'string' || !/^[a-zA-Z0-9]{3,20}$/.test(username)) {
-    return res.status(400).json({ error: 'Invalid username format' });
-  }
-  if (!password || typeof password !== 'string' || password.length < 6 || password.length > 50) {
-    return res.status(400).json({ error: 'Invalid password format' });
-  }
-  db.get('SELECT * FROM users WHERE username = ?', [username], async (err, user) => {
+  db.all(sql, params, (err, rows) => {
     if (err) {
-      console.error('Login DB error:', err);
-      return res.status(500).json({ error: 'Login failed' });
+      return res.status(500).json({ error: err.message });
     }
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) {
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-    req.session.user = { id: user.id, username: user.username, role: user.role };
-    res.json({ id: user.id, username: user.username, role: user.role });
+    res.json(rows);
   });
 });
+
+// Transfers endpoints
+// Create a transfer (log sending an item to another department)
+app.post('/api/transfers', requireLogin, (req, res) => {
+  const { inventory_id, from_department, to_department, sent_by, notes } = req.body;
+  if (!inventory_id || isNaN(Number(inventory_id))) return res.status(400).json({ error: 'Invalid inventory_id' });
+  if (!from_department || !isValidString(from_department)) return res.status(400).json({ error: 'Invalid from_department' });
+  if (!to_department || !isValidString(to_department)) return res.status(400).json({ error: 'Invalid to_department' });
+  if (!sent_by || !isValidString(sent_by)) return res.status(400).json({ error: 'Invalid sent_by' });
+  const sent_at = new Date().toISOString();
+  // Ensure inventory exists
+  db.get('SELECT * FROM inventory WHERE id = ?', [inventory_id], (err, inv) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!inv) return res.status(400).json({ error: 'Inventory item not found' });
+    db.run(
+      'INSERT INTO transfers (inventory_id, from_department, to_department, sent_by, sent_at, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [inventory_id, from_department, to_department, sent_by, sent_at, 'Sent', notes || ''],
+      function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ id: this.lastID });
+      }
+    );
+  });
+});
+
+// Get all transfers (optionally filter by department or status)
+app.get('/api/transfers', requireLogin, (req, res) => {
+  const { department, status } = req.query;
+  let sql = `SELECT t.*, i.asset_no, i.asset_type, i.serial_no as item_serial_no, i.manufacturer as item_manufacturer, i.model as item_model, i.version as item_version, i.department as item_department FROM transfers t LEFT JOIN inventory i ON t.inventory_id = i.id`;
+  const params = [];
+  const conditions = [];
+  if (department) {
+    conditions.push('(from_department = ? OR to_department = ?)');
+    params.push(department, department);
+  }
+  if (status) {
+    conditions.push('status = ?');
+    params.push(status);
+  }
+  if (conditions.length > 0) sql += ' WHERE ' + conditions.join(' AND ');
+  sql += ' ORDER BY sent_at DESC';
+  db.all(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows);
+  });
+});
+
+// Acknowledge receipt of transfer
+app.post('/api/transfers/:id/acknowledge', requireLogin, (req, res) => {
+  const { id } = req.params;
+  const { received_by } = req.body;
+  if (!id || isNaN(Number(id))) return res.status(400).json({ error: 'Invalid transfer id' });
+  if (!received_by || !isValidString(received_by)) return res.status(400).json({ error: 'Invalid received_by' });
+  const received_at = new Date().toISOString();
+  db.run('UPDATE transfers SET status = ?, received_by = ?, received_at = ? WHERE id = ?', ['Received', received_by, received_at, id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ updated: this.changes });
+  });
+});
+
+// Get specific transfer
+app.get('/api/transfers/:id', requireLogin, (req, res) => {
+  const { id } = req.params;
+  if (!id || isNaN(Number(id))) return res.status(400).json({ error: 'Invalid transfer id' });
+  const sql = `SELECT t.*, i.asset_no, i.asset_type, i.serial_no as item_serial_no, i.manufacturer as item_manufacturer, i.model as item_model, i.version as item_version, i.department as item_department FROM transfers t LEFT JOIN inventory i ON t.inventory_id = i.id WHERE t.id = ?`;
+  db.get(sql, [id], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!row) return res.status(404).json({ error: 'Transfer not found' });
+    res.json(row);
+  });
+});
+
+// ...existing code...
+

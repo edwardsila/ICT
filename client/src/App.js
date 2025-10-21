@@ -8,6 +8,7 @@ import Inventory from './pages/Inventory';
 import Maintenance from './pages/Maintenance';
 import Reports from './pages/Reports';
 import Admin from './pages/Admin';
+import Transfers from './pages/Transfers';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Users from './pages/Users';
@@ -102,6 +103,16 @@ function ModernHome() {
             </div>
           </div>
         </div>
+        <div className="col-md-4">
+          <div className="card shadow h-100 text-center">
+            <div className="card-body">
+              <i className="bi bi-arrow-left-right display-4 text-secondary mb-3"></i>
+              <h4 className="mb-2">Transfers</h4>
+              <p>Send inventory items to other departments and track acknowledgments.</p>
+              <Link to="/transfers" className="btn btn-secondary w-100">Go to Transfers</Link>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -152,6 +163,7 @@ function App() {
                 <li className="nav-item">
                   <Link className="nav-link" to="/maintenance">Maintenance</Link>
                 </li>
+                {/* Transfers link removed - accessible from Home page */}
                 <li className="nav-item">
                   <Link className="nav-link" to="/reports">Reports</Link>
                 </li>
@@ -191,6 +203,7 @@ function App() {
             <Route path="/maintenance" element={<ProtectedRoute element={<Maintenance />} />} />
             <Route path="/reports" element={<ProtectedRoute element={<ReportsMessageWrapper />} adminOnly={true} />} />
             <Route path="/admin" element={<ProtectedRoute element={<Admin />} adminOnly={true} />} />
+            <Route path="/transfers" element={<ProtectedRoute element={<Transfers />} />} />
             <Route path="/users" element={<ProtectedRoute element={<Users />} />} />
             <Route path="/settings" element={<ProtectedRoute element={<Settings />} />} />
             <Route path="/login" element={<Login />} />
