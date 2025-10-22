@@ -10,6 +10,8 @@ const Admin = () => {
   const [accessDenied, setAccessDenied] = useState(false);
   const [reportType, setReportType] = useState('inventory');
   const [reportData, setReportData] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [newDept, setNewDept] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -37,9 +39,16 @@ const Admin = () => {
         const usersData = usersRes.ok ? await usersRes.json() : [];
         const inventoryData = inventoryRes.ok ? await inventoryRes.json() : [];
         const maintenanceData = maintenanceRes.ok ? await maintenanceRes.json() : [];
+        // fetch departments
+        let depts = [];
+        try {
+          const dres = await fetch('/api/departments', { credentials: 'include' });
+          if (dres.ok) depts = await dres.json();
+        } catch (e) { depts = []; }
         setUsers(Array.isArray(usersData) ? usersData : []);
         setInventory(Array.isArray(inventoryData) ? inventoryData : []);
         setMaintenance(Array.isArray(maintenanceData) ? maintenanceData : []);
+        setDepartments(Array.isArray(depts) ? depts : []);
       } catch (err) {
         setUsers([]);
         setInventory([]);
@@ -181,6 +190,41 @@ const Admin = () => {
                   </table>
                 </div>
                 <Link to="/maintenance" className="btn btn-warning btn-sm">Add/View Maintenance</Link>
+              </div>
+            </div>
+          </div>
+          <div className="col-md-6">
+            <div className="card shadow h-100">
+              <div className="card-body">
+                <h4 className="fw-bold mb-2"><i className="bi bi-list-ul text-secondary"></i> Departments</h4>
+                <div className="mb-3">
+                  <div style={{maxHeight:'200px',overflowY:'auto'}}>
+                    <table className="table table-sm table-bordered">
+                      <thead><tr><th>Name</th></tr></thead>
+                      <tbody>
+                        {departments.map(d => (
+                          <tr key={d.id}><td>{d.name}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div className="d-flex">
+                  <input className="form-control form-control-sm me-2" value={newDept} onChange={e=>setNewDept(e.target.value)} placeholder="New department name" />
+                  <button className="btn btn-secondary btn-sm" onClick={async ()=>{
+                    if (!newDept || newDept.trim().length<1) return;
+                    try {
+                      const res = await fetch('/api/departments', { method: 'POST', credentials: 'include', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ name: newDept.trim() }) });
+                      if (res.ok) {
+                        const nd = await res.json();
+                        setDepartments(prev=>[...prev, nd]);
+                        setNewDept('');
+                      } else {
+                        alert('Failed to add department');
+                      }
+                    } catch (e) { alert('Error adding department'); }
+                  }}>Add</button>
+                </div>
               </div>
             </div>
           </div>
