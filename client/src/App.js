@@ -69,7 +69,7 @@ function ModernHome() {
         <div className="col-md-8 text-center">
           <img src={mwalimuLogo} alt="Mwalimu Sacco Logo" style={{height: '120px', maxWidth: '320px', marginBottom: '24px', borderRadius: '24px', boxShadow: '0 4px 24px rgba(31,38,135,0.25)', background: '#fff', padding: '12px'}} />
           <h1 className="fw-bold mb-2" style={{color: '#1b5e20'}}>MNSS ICT Portal</h1>
-          <p className="lead" style={{color: '#333'}}>Welcome to the MWALIMU NATIONAL SACCO ICT system for MWALIMU Towers. Manage inventory, maintenance, and reports with ease.</p>
+          <p className="lead" style={{color: '#333'}}>Welcome to the MWALIMU NATIONAL SACCO ICT SYSTEM. Manage inventory, maintenance, and reports with ease.</p>
         </div>
       </div>
       <div className="row g-4 justify-content-center">
@@ -78,8 +78,8 @@ function ModernHome() {
             <div className="card-body">
               <i className="bi bi-box-seam display-4 text-success mb-3"></i>
               <h4 className="mb-2">Inventory</h4>
-              <p>Track and manage all ICT equipment and assets.</p>
-              <Link to="/inventory" className="btn btn-success w-100">Go to Inventory</Link>
+              <p>Add all ICT equipment and assets.</p>
+              <Link to="/inventory" className="btn btn-success w-100">Add Inventory</Link>
             </div>
           </div>
         </div>

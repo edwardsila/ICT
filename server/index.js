@@ -244,6 +244,63 @@ app.get('/api/inventory/:id', requireLogin, (req, res) => {
   db.get('SELECT * FROM inventory WHERE id = ?', [id], (err, row) => { if (err) return res.status(500).json({ error: err.message }); if (!row) return res.status(404).json({ error: 'Item not found' }); res.json(row); });
 });
 
+// Lookup inventory by tag (asset_no or serial_no)
+app.get('/api/inventory/by-tag', requireLogin, (req, res) => {
+  const tag = req.query.tag;
+  if (!tag || typeof tag !== 'string' || tag.trim().length === 0) return res.status(400).json({ error: 'Tag required' });
+  const t = tag.trim();
+  // Normalize and perform a sequence of attempts:
+  // 1) exact match on asset_no/serial_no after removing hyphens and uppercasing
+  // 2) exact match on UPPER(asset_no)/UPPER(serial_no)
+  // 3) prefix match on UPPER(asset_no)/UPPER(serial_no)
+  // 4) contains match on REPLACE(UPPER(asset_no),'-','') and serial_no
+  const normalized = t.toUpperCase();
+  const noHyphen = normalized.replace(/[-\s]/g, '');
+
+  const tryExactNoHyphen = () => {
+    const sql = `SELECT * FROM inventory WHERE REPLACE(UPPER(asset_no), '-', '') = ? OR REPLACE(UPPER(serial_no), '-', '') = ? LIMIT 1`;
+    return new Promise((resolve, reject) => db.get(sql, [noHyphen, noHyphen], (err, row) => err ? reject(err) : resolve(row)));
+  };
+  const tryExactUpper = () => {
+    const sql = `SELECT * FROM inventory WHERE UPPER(asset_no) = ? OR UPPER(serial_no) = ? LIMIT 1`;
+    return new Promise((resolve, reject) => db.get(sql, [normalized, normalized], (err, row) => err ? reject(err) : resolve(row)));
+  };
+  const tryPrefix = () => {
+    const sql = `SELECT * FROM inventory WHERE UPPER(asset_no) LIKE ? OR UPPER(serial_no) LIKE ? LIMIT 1`;
+    return new Promise((resolve, reject) => db.get(sql, [normalized + '%', normalized + '%'], (err, row) => err ? reject(err) : resolve(row)));
+  };
+  const tryContainsNoHyphen = () => {
+    const likeVal = '%' + noHyphen + '%';
+    const sql = `SELECT * FROM inventory WHERE REPLACE(UPPER(asset_no), '-', '') LIKE ? OR REPLACE(UPPER(serial_no), '-', '') LIKE ? LIMIT 1`;
+    return new Promise((resolve, reject) => db.get(sql, [likeVal, likeVal], (err, row) => err ? reject(err) : resolve(row)));
+  };
+
+  (async () => {
+    try {
+      let row = await tryExactNoHyphen();
+      if (!row) row = await tryExactUpper();
+      if (!row) row = await tryPrefix();
+      if (!row) row = await tryContainsNoHyphen();
+      if (!row) return res.status(404).json({ error: 'Not found' });
+      res.json(row);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  })();
+});
+
+// Return latest N inventory items (by received_at desc)
+app.get('/api/inventory/recent', requireLogin, (req, res) => {
+  let limit = parseInt(req.query.limit, 10) || 10;
+  if (isNaN(limit) || limit <= 0) limit = 10;
+  if (limit > 100) limit = 100;
+  const sql = `SELECT * FROM inventory ORDER BY received_at DESC LIMIT ?`;
+  db.all(sql, [limit], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows || []);
+  });
+});
+
 
 app.put('/api/inventory/:id', requireLogin, (req, res) => {
   const { id } = req.params;
@@ -332,6 +389,61 @@ app.post('/api/maintenance/:id/mark-returned', requireLogin, (req, res) => {
   db.run("UPDATE maintenance SET returned = 1, returned_at = ?, repair_notes = COALESCE(repair_notes, '') || ?, repair_status = ? WHERE id = ?", [returned_at, '\n' + (notes || ''), repair_status || 'Returned', id], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ updated: this.changes });
+  });
+});
+
+// Create maintenance records for a whole department (optionally per-device)
+app.post('/api/maintenance/department', requireLogin, (req, res) => {
+  const { department, date, equipment, equipment_model, user, repair_notes, inventory_ids, create_for_all } = req.body;
+  if (!department || typeof department !== 'string' || department.length < 1 || department.length > 100) return res.status(400).json({ error: 'Invalid department' });
+  if (!date || typeof date !== 'string' || date.length < 4 || date.length > 50) return res.status(400).json({ error: 'Invalid date' });
+  if (!user || typeof user !== 'string' || user.length < 1 || user.length > 100) return res.status(400).json({ error: 'Invalid user' });
+
+  const dept = department;
+
+  // If create_for_all is true, fetch all inventory items for the department and create per-item maintenance records
+  const createForInventoryList = (items) => {
+    if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'No inventory items found for department' });
+    const createdIds = [];
+    db.serialize(() => {
+      const stmt = db.prepare('INSERT INTO maintenance (date, equipment, tagnumber, department, equipment_model, user, inventory_id, repair_notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+      items.forEach(it => {
+        const tagnumber = String(it.asset_no || `DEPT-${dept}-${Date.now()}`).slice(0,50);
+        stmt.run(date, equipment || it.asset_type || 'Device', tagnumber, dept, equipment_model || it.model || '', user, it.id, repair_notes || '');
+        // Can't get lastID easily here synchronously — collect using lastID in final callback is complex; we will return a count instead
+      });
+      stmt.finalize(err => {
+        if (err) return res.status(500).json({ error: err.message });
+        return res.json({ created: items.length });
+      });
+    });
+  };
+
+  if (create_for_all) {
+    db.all('SELECT id, asset_no, asset_type, model FROM inventory WHERE department = ?', [dept], (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      createForInventoryList(rows || []);
+    });
+    return;
+  }
+
+  // If inventory_ids provided, create entries for those
+  if (Array.isArray(inventory_ids) && inventory_ids.length > 0) {
+    // validate each id exists
+    const placeholders = inventory_ids.map(() => '?').join(',');
+    db.all(`SELECT id, asset_no, asset_type, model FROM inventory WHERE id IN (${placeholders})`, inventory_ids, (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      if (!rows || rows.length === 0) return res.status(400).json({ error: 'No matching inventory items found' });
+      createForInventoryList(rows);
+    });
+    return;
+  }
+
+  // Otherwise create a single department-level maintenance record (inventory_id NULL)
+  const tagnumber = `DEPT-MAINT-${dept}-${Date.now()}`.slice(0,50);
+  db.run('INSERT INTO maintenance (date, equipment, tagnumber, department, equipment_model, user, inventory_id, repair_notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [date, equipment || 'Department Sweep', tagnumber, dept, equipment_model || '', user, null, repair_notes || ''], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ id: this.lastID });
   });
 });
 

@@ -11,6 +11,7 @@ const Admin = () => {
   const [reportType, setReportType] = useState('inventory');
   const [reportData, setReportData] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [recentItems, setRecentItems] = useState([]);
   const [newDept, setNewDept] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const navigate = useNavigate();
@@ -49,6 +50,16 @@ const Admin = () => {
         setInventory(Array.isArray(inventoryData) ? inventoryData : []);
         setMaintenance(Array.isArray(maintenanceData) ? maintenanceData : []);
         setDepartments(Array.isArray(depts) ? depts : []);
+        // load recent items (latest 10)
+        try {
+          const rres = await fetch('/api/inventory/recent?limit=10', { credentials: 'include' });
+          if (rres.ok) {
+            const rdata = await rres.json();
+            if (Array.isArray(rdata)) setRecentItems(rdata);
+          }
+        } catch (e) {
+          // ignore recent load errors
+        }
       } catch (err) {
         setUsers([]);
         setInventory([]);
@@ -200,7 +211,9 @@ const Admin = () => {
                 <div className="mb-3">
                   <div style={{maxHeight:'200px',overflowY:'auto'}}>
                     <table className="table table-sm table-bordered">
-                      <thead><tr><th>Name</th></tr></thead>
+                      <thead>
+                        <tr><th>Name</th></tr>
+                      </thead>
                       <tbody>
                         {departments.map(d => (
                           <tr key={d.id}><td>{d.name}</td></tr>
@@ -224,6 +237,77 @@ const Admin = () => {
                       }
                     } catch (e) { alert('Error adding department'); }
                   }}>Add</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Department filter buttons and recently added list */}
+          <div className="col-12 mt-3">
+            <div className="card shadow h-100">
+              <div className="card-body">
+                <h4 className="fw-bold mb-2"><i className="bi bi-clock-history text-info"></i> Recently Added</h4>
+                <div className="mb-3">
+                  <div className="d-flex flex-wrap gap-2 mb-3">
+                    {[...new Set(['UNASSIGNED', ...(departments.map(d=>d.name || ''))])].map(dept => (
+                      <button key={dept} className={`btn btn-outline-primary`} onClick={async ()=>{
+                        try {
+                          const url = `/api/inventory/recent?limit=10&department=${encodeURIComponent(dept)}`;
+                          const r = await fetch(url, { credentials: 'include' });
+                          if (r.ok) {
+                            const data = await r.json();
+                            if (Array.isArray(data)) setRecentItems(data);
+                          }
+                        } catch (e) { /* ignore */ }
+                      }}>{dept}</button>
+                    ))}
+                    <button className="btn btn-secondary" onClick={async ()=>{
+                      try {
+                        const r = await fetch('/api/inventory/recent?limit=10', { credentials: 'include' });
+                        if (r.ok) {
+                          const data = await r.json();
+                          if (Array.isArray(data)) setRecentItems(data);
+                        }
+                      } catch (e) {}
+                    }}>All</button>
+                  </div>
+
+                  {recentItems && recentItems.length > 0 ? (
+                    <div style={{maxHeight:'300px', overflowY:'auto'}}>
+                      <table className="table table-sm table-bordered">
+                        <thead>
+                          <tr>
+                            <th>Asset No</th>
+                            <th>Department</th>
+                            <th>Asset Type</th>
+                            <th>Serial No</th>
+                            <th>Manufacturer</th>
+                            <th>Model</th>
+                            <th>Model Year</th>
+                            <th>OS</th>
+                            <th>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {recentItems.map(item => (
+                            <tr key={item.id}>
+                              <td>{item.asset_no}</td>
+                              <td>{item.department}</td>
+                              <td>{item.asset_type}</td>
+                              <td>{item.serial_no}</td>
+                              <td>{item.manufacturer}</td>
+                              <td>{item.model}</td>
+                              <td>{item.version}</td>
+                              <td>{item.os_info}</td>
+                              <td>{item.status}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-muted">No recent items to show.</div>
+                  )}
                 </div>
               </div>
             </div>

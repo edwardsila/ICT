@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
 const Inventory = () => {
-  const [selectedDept, setSelectedDept] = useState('');
+  // Inventory page only needs the add form; department selection stays in the form state
   const [form, setForm] = useState({
     asset_no: '',
     asset_type: '',
@@ -15,8 +15,8 @@ const Inventory = () => {
     department: 'UNASSIGNED'
   });
   const [message, setMessage] = useState('');
-  const [addedItems, setAddedItems] = useState({});
   const [DEPARTMENTS, setDEPARTMENTS] = useState([]);
+  // recentItems moved to Admin dashboard
 
   useEffect(() => {
     async function loadDepts() {
@@ -31,7 +31,17 @@ const Inventory = () => {
       }
     }
     loadDepts();
+    // If a serial query param is present (navigated from Maintenance -> Add device), prefill it
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const serial = params.get('serial');
+      if (serial) setForm(f => ({ ...f, serial_no: serial }));
+    } catch (e) {
+      // ignore if URLSearchParams not available
+    }
   }, []);
+
+  // recent-items UI and logic moved to Admin.js
 
   const handleChange = e => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -49,12 +59,7 @@ const Inventory = () => {
       if (res.ok) {
         const created = await res.json();
         setMessage('Item added successfully!');
-        setAddedItems(prev => {
-          const dept = created.department || payload.department || 'UNASSIGNED';
-          const deptItems = prev[dept] || [];
-          return { ...prev, [dept]: [...deptItems, created] };
-        });
-        setForm({ asset_no: '', asset_type: '', serial_no: '', manufacturer: '', model: '', version: '', os_info: '', status: 'Active', department: payload.department || 'UNASSIGNED' });
+  setForm({ asset_no: '', asset_type: '', serial_no: '', manufacturer: '', model: '', version: '', os_info: '', status: 'Active', department: payload.department || 'UNASSIGNED' });
       } else {
         const err = await res.json();
         setMessage(err.error || 'Failed to add item');
@@ -71,15 +76,6 @@ const Inventory = () => {
       </div>
 
       <h2 className="mb-4">Inventory</h2>
-
-      <div className="mb-4">
-        <h5>Filter Recently Added</h5>
-        <div className="d-flex flex-wrap gap-2">
-          {[...new Set(['UNASSIGNED', ...DEPARTMENTS])].map(dept => (
-            <button key={dept} className={`btn btn-${selectedDept === dept ? 'primary' : 'outline-primary'}`} onClick={() => setSelectedDept(dept)}>{dept}</button>
-          ))}
-        </div>
-      </div>
 
       <div className="card shadow mb-4">
         <div className="card-body">
@@ -150,44 +146,7 @@ const Inventory = () => {
           </form>
         </div>
       </div>
-
-      <div className="card shadow">
-        <div className="card-body">
-          <h5>Recently Added Items{selectedDept ? ` for ${selectedDept}` : ''}</h5>
-          {(selectedDept && addedItems[selectedDept] && addedItems[selectedDept].length > 0) ? (
-            <table className="table table-bordered table-sm">
-              <thead>
-                <tr>
-                  <th>Asset No</th>
-                  <th>Asset Type</th>
-                  <th>Serial No</th>
-                  <th>Manufacturer</th>
-                  <th>Model</th>
-                  <th>Version</th>
-                  <th>OS</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {addedItems[selectedDept].map((item, idx) => (
-                  <tr key={idx}>
-                    <td>{item.asset_no}</td>
-                    <td>{item.asset_type}</td>
-                    <td>{item.serial_no}</td>
-                    <td>{item.manufacturer}</td>
-                    <td>{item.model}</td>
-                    <td>{item.version}</td>
-                    <td>{item.os_info}</td>
-                    <td>{item.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <div className="text-muted">No items added yet for this department.</div>
-          )}
-        </div>
-      </div>
+      
     </div>
   );
 };
