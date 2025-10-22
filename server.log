@@ -1,0 +1,7 @@
+nohup: ignoring input
+Server running on port 4000
+Connected to SQLite database.
+Registration DB error: [Error: SQLITE_CONSTRAINT: UNIQUE constraint failed: users.username] {
+  errno: 19,
+  code: 'SQLITE_CONSTRAINT'
+}

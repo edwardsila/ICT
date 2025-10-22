@@ -97,7 +97,7 @@ const createTables = (cb) => {
     )`);
 
     // Seed default departments if not present
-    const defaultDepts = ['BANK','CENTRAL OPERATIONS','CUSTOMER EXPERIENCE','RECORDS','FINANCE','REGISTRY','HR','CREDIT & LOANS','AUDITING'];
+  const defaultDepts = ['UNASSIGNED','BANK','CENTRAL OPERATIONS','CUSTOMER EXPERIENCE','RECORDS','FINANCE','REGISTRY','HR','CREDIT & LOANS','AUDITING'];
     defaultDepts.forEach(d => {
       db.run('INSERT OR IGNORE INTO departments (name) VALUES (?)', [d]);
     });
@@ -127,6 +127,44 @@ db.serialize(() => {
         if (alterErr) console.error('Failed to add os_info column:', alterErr.message);
       });
     }
+  });
+});
+
+// Ensure inventory has columns for received and replacement tracking
+db.serialize(() => {
+  db.all("PRAGMA table_info(inventory)", [], (err, cols) => {
+    if (err) {
+      console.error('Failed to read inventory table info for replacements', err);
+      return;
+    }
+    const colNames = (cols || []).map(c => c.name);
+    const toAdd = [];
+    if (!colNames.includes('received_at')) toAdd.push("ALTER TABLE inventory ADD COLUMN received_at TEXT");
+    if (!colNames.includes('replacement_of')) toAdd.push("ALTER TABLE inventory ADD COLUMN replacement_of INTEGER");
+    if (!colNames.includes('replaced_by')) toAdd.push("ALTER TABLE inventory ADD COLUMN replaced_by INTEGER");
+    toAdd.forEach(sql => { db.run(sql, (aErr) => { if (aErr) console.error('Failed to alter inventory table:', aErr.message); }); });
+  });
+});
+
+// Ensure maintenance has repair-tracking columns
+db.serialize(() => {
+  db.all("PRAGMA table_info(maintenance)", [], (err, cols) => {
+    if (err) {
+      console.error('Failed to read maintenance table info', err);
+      return;
+    }
+    const colNames = (cols || []).map(c => c.name);
+    const toAdd = [];
+    if (!colNames.includes('inventory_id')) toAdd.push("ALTER TABLE maintenance ADD COLUMN inventory_id INTEGER");
+    if (!colNames.includes('sent_to_ict')) toAdd.push("ALTER TABLE maintenance ADD COLUMN sent_to_ict INTEGER DEFAULT 0");
+    if (!colNames.includes('sent_to_ict_at')) toAdd.push("ALTER TABLE maintenance ADD COLUMN sent_to_ict_at TEXT");
+    if (!colNames.includes('returned')) toAdd.push("ALTER TABLE maintenance ADD COLUMN returned INTEGER DEFAULT 0");
+    if (!colNames.includes('returned_at')) toAdd.push("ALTER TABLE maintenance ADD COLUMN returned_at TEXT");
+    if (!colNames.includes('repair_notes')) toAdd.push("ALTER TABLE maintenance ADD COLUMN repair_notes TEXT");
+    if (!colNames.includes('repair_status')) toAdd.push("ALTER TABLE maintenance ADD COLUMN repair_status TEXT");
+    toAdd.forEach(sql => {
+      db.run(sql, (aErr) => { if (aErr) console.error('Failed to alter maintenance table:', aErr.message); });
+    });
   });
 });
 
@@ -237,11 +275,91 @@ app.delete('/api/inventory/:id', requireLogin, (req, res) => {
 });
 
 // MAINTENANCE ENDPOINTS
-app.get('/api/maintenance', requireLogin, (req, res) => { db.all('SELECT * FROM maintenance', [], (err, rows) => { if (err) return res.status(500).json({ error: err.message }); res.json(rows); }); });
-app.get('/api/maintenance/:id', requireLogin, (req, res) => { const { id } = req.params; if (!id || isNaN(Number(id))) return res.status(400).json({ error: 'Invalid maintenance ID' }); db.get('SELECT * FROM maintenance WHERE id = ?', [id], (err, row) => { if (err) return res.status(500).json({ error: err.message }); if (!row) return res.status(404).json({ error: 'Record not found' }); res.json(row); }); });
-app.post('/api/maintenance', requireLogin, (req, res) => { const { date, equipment, tagnumber, department, equipment_model, user } = req.body; if (!date || typeof date !== 'string' || date.length < 4 || date.length > 50) return res.status(400).json({ error: 'Invalid date' }); if (!equipment || typeof equipment !== 'string' || equipment.length < 1 || equipment.length > 200) return res.status(400).json({ error: 'Invalid equipment' }); if (!tagnumber || typeof tagnumber !== 'string' || tagnumber.length < 1 || tagnumber.length > 50) return res.status(400).json({ error: 'Invalid tagnumber' }); if (!department || typeof department !== 'string' || department.length < 1 || department.length > 50) return res.status(400).json({ error: 'Invalid department' }); if (!equipment_model || typeof equipment_model !== 'string' || equipment_model.length < 1 || equipment_model.length > 100) return res.status(400).json({ error: 'Invalid equipment_model' }); if (!user || typeof user !== 'string' || user.length < 1 || user.length > 100) return res.status(400).json({ error: 'Invalid user' }); db.run('INSERT INTO maintenance (date, equipment, tagnumber, department, equipment_model, user) VALUES (?, ?, ?, ?, ?, ?)', [date, equipment, tagnumber, department, equipment_model, user], function(err) { if (err) return res.status(400).json({ error: err.message }); res.json({ id: this.lastID }); }); });
+app.get('/api/maintenance', requireLogin, (req, res) => {
+  const sql = `SELECT m.*, i.asset_no as inventory_asset_no, i.asset_type as inventory_asset_type, i.serial_no as inventory_serial_no, i.manufacturer as inventory_manufacturer, i.model as inventory_model, i.version as inventory_version, i.os_info as inventory_os, i.department as inventory_department FROM maintenance m LEFT JOIN inventory i ON m.inventory_id = i.id`;
+  db.all(sql, [], (err, rows) => { if (err) return res.status(500).json({ error: err.message }); res.json(rows); });
+});
 
-app.put('/api/maintenance/:id', requireLogin, (req, res) => { const { id } = req.params; const { date, equipment, tagnumber, department, equipment_model, user } = req.body; if (!id || isNaN(Number(id))) return res.status(400).json({ error: 'Invalid maintenance ID' }); if (!date || typeof date !== 'string' || date.length < 4 || date.length > 50) return res.status(400).json({ error: 'Invalid date' }); if (!equipment || typeof equipment !== 'string' || equipment.length < 1 || equipment.length > 200) return res.status(400).json({ error: 'Invalid equipment' }); if (!tagnumber || typeof tagnumber !== 'string' || tagnumber.length < 1 || tagnumber.length > 50) return res.status(400).json({ error: 'Invalid tagnumber' }); if (!department || typeof department !== 'string' || department.length < 1 || department.length > 50) return res.status(400).json({ error: 'Invalid department' }); if (!equipment_model || typeof equipment_model !== 'string' || equipment_model.length < 1 || equipment_model.length > 100) return res.status(400).json({ error: 'Invalid equipment_model' }); if (!user || typeof user !== 'string' || user.length < 1 || user.length > 100) return res.status(400).json({ error: 'Invalid user' }); db.run('UPDATE maintenance SET date = ?, equipment = ?, tagnumber = ?, department = ?, equipment_model = ?, user = ? WHERE id = ?', [date, equipment, tagnumber, department, equipment_model, user, id], function(err) { if (err) return res.status(400).json({ error: err.message }); res.json({ updated: this.changes }); }); });
+app.get('/api/maintenance/:id', requireLogin, (req, res) => {
+  const { id } = req.params;
+  if (!id || isNaN(Number(id))) return res.status(400).json({ error: 'Invalid maintenance ID' });
+  const sql = `SELECT m.*, i.asset_no as inventory_asset_no, i.asset_type as inventory_asset_type, i.serial_no as inventory_serial_no, i.manufacturer as inventory_manufacturer, i.model as inventory_model, i.version as inventory_version, i.os_info as inventory_os, i.department as inventory_department FROM maintenance m LEFT JOIN inventory i ON m.inventory_id = i.id WHERE m.id = ?`;
+  db.get(sql, [id], (err, row) => { if (err) return res.status(500).json({ error: err.message }); if (!row) return res.status(404).json({ error: 'Record not found' }); res.json(row); });
+});
+app.post('/api/maintenance', requireLogin, (req, res) => {
+  const { date, equipment, tagnumber, department, equipment_model, user, inventory_id, repair_notes } = req.body;
+  if (!date || typeof date !== 'string' || date.length < 4 || date.length > 50) return res.status(400).json({ error: 'Invalid date' });
+  if (!equipment || typeof equipment !== 'string' || equipment.length < 1 || equipment.length > 200) return res.status(400).json({ error: 'Invalid equipment' });
+  if (!tagnumber || typeof tagnumber !== 'string' || tagnumber.length < 1 || tagnumber.length > 50) return res.status(400).json({ error: 'Invalid tagnumber' });
+  if (!department || typeof department !== 'string' || department.length < 1 || department.length > 50) return res.status(400).json({ error: 'Invalid department' });
+  if (!equipment_model || typeof equipment_model !== 'string' || equipment_model.length < 1 || equipment_model.length > 100) return res.status(400).json({ error: 'Invalid equipment_model' });
+  if (!user || typeof user !== 'string' || user.length < 1 || user.length > 100) return res.status(400).json({ error: 'Invalid user' });
+
+  // if inventory_id provided, validate it exists
+  const insertMaintenance = () => {
+    db.run('INSERT INTO maintenance (date, equipment, tagnumber, department, equipment_model, user, inventory_id, repair_notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [date, equipment, tagnumber, department, equipment_model, user, inventory_id || null, repair_notes || ''], function(err) { if (err) return res.status(400).json({ error: err.message }); res.json({ id: this.lastID }); });
+  };
+
+  if (inventory_id) {
+    db.get('SELECT id FROM inventory WHERE id = ?', [inventory_id], (iErr, iRow) => {
+      if (iErr) return res.status(500).json({ error: iErr.message });
+      if (!iRow) return res.status(400).json({ error: 'Referenced inventory item does not exist' });
+      insertMaintenance();
+    });
+  } else {
+    insertMaintenance();
+  }
+});
+
+// Mark maintenance record as sent to ICT (for repair)
+app.post('/api/maintenance/:id/send-to-ict', requireLogin, (req, res) => {
+  const { id } = req.params;
+  const { notes } = req.body;
+  if (!id || isNaN(Number(id))) return res.status(400).json({ error: 'Invalid maintenance ID' });
+  const sent_at = new Date().toISOString();
+  db.run("UPDATE maintenance SET sent_to_ict = 1, sent_to_ict_at = ?, repair_notes = COALESCE(repair_notes, '') || ? WHERE id = ?", [sent_at, '\n' + (notes || ''), id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ updated: this.changes });
+  });
+});
+
+// Mark maintenance record as returned from ICT
+app.post('/api/maintenance/:id/mark-returned', requireLogin, (req, res) => {
+  const { id } = req.params;
+  const { notes, repair_status } = req.body;
+  if (!id || isNaN(Number(id))) return res.status(400).json({ error: 'Invalid maintenance ID' });
+  const returned_at = new Date().toISOString();
+  db.run("UPDATE maintenance SET returned = 1, returned_at = ?, repair_notes = COALESCE(repair_notes, '') || ?, repair_status = ? WHERE id = ?", [returned_at, '\n' + (notes || ''), repair_status || 'Returned', id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ updated: this.changes });
+  });
+});
+
+app.put('/api/maintenance/:id', requireLogin, (req, res) => {
+  const { id } = req.params;
+  const { date, equipment, tagnumber, department, equipment_model, user, inventory_id, sent_to_ict, returned, repair_notes, repair_status } = req.body;
+  if (!id || isNaN(Number(id))) return res.status(400).json({ error: 'Invalid maintenance ID' });
+  if (!date || typeof date !== 'string' || date.length < 4 || date.length > 50) return res.status(400).json({ error: 'Invalid date' });
+  if (!equipment || typeof equipment !== 'string' || equipment.length < 1 || equipment.length > 200) return res.status(400).json({ error: 'Invalid equipment' });
+  if (!tagnumber || typeof tagnumber !== 'string' || tagnumber.length < 1 || tagnumber.length > 50) return res.status(400).json({ error: 'Invalid tagnumber' });
+  if (!department || typeof department !== 'string' || department.length < 1 || department.length > 50) return res.status(400).json({ error: 'Invalid department' });
+  if (!equipment_model || typeof equipment_model !== 'string' || equipment_model.length < 1 || equipment_model.length > 100) return res.status(400).json({ error: 'Invalid equipment_model' });
+  if (!user || typeof user !== 'string' || user.length < 1 || user.length > 100) return res.status(400).json({ error: 'Invalid user' });
+
+  const doUpdate = () => {
+    db.run('UPDATE maintenance SET date = ?, equipment = ?, tagnumber = ?, department = ?, equipment_model = ?, user = ?, inventory_id = ?, sent_to_ict = ?, returned = ?, repair_notes = ?, repair_status = ? WHERE id = ?', [date, equipment, tagnumber, department, equipment_model, user, inventory_id || null, sent_to_ict ? 1 : 0, returned ? 1 : 0, repair_notes || '', repair_status || '', id], function(err) { if (err) return res.status(400).json({ error: err.message }); res.json({ updated: this.changes }); });
+  };
+
+  if (inventory_id) {
+    db.get('SELECT id FROM inventory WHERE id = ?', [inventory_id], (iErr, iRow) => {
+      if (iErr) return res.status(500).json({ error: iErr.message });
+      if (!iRow) return res.status(400).json({ error: 'Referenced inventory item does not exist' });
+      doUpdate();
+    });
+  } else {
+    doUpdate();
+  }
+});
 app.delete('/api/maintenance/:id', requireLogin, (req, res) => { const { id } = req.params; if (!id || isNaN(Number(id))) return res.status(400).json({ error: 'Invalid maintenance ID' }); db.run('DELETE FROM maintenance WHERE id = ?', [id], function(err) { if (err) return res.status(400).json({ error: err.message }); res.json({ deleted: this.changes }); }); });
 
 // Reports endpoint
@@ -297,44 +415,70 @@ function getNextAssetNumber(department, cb) {
 }
 
 app.post('/api/inventory', requireLogin, (req, res) => {
-  let { asset_no, asset_type, serial_no, manufacturer, model, version, os_info, status, department } = req.body;
-  // normalize department
+  let { asset_no, asset_type, serial_no, manufacturer, model, version, os_info, status, department, replacement_of } = req.body;
+  // initial normalize
   department = department ? String(department).toUpperCase() : '';
-  if (!department || !isValidString(department,1,100)) return res.status(400).json({ error: 'Invalid department' });
-  // verify department exists
-  db.get('SELECT id FROM departments WHERE name = ?', [department], (dErr, dRow) => {
-    if (dErr) return res.status(500).json({ error: dErr.message });
-    if (!dRow) return res.status(400).json({ error: 'Department does not exist' });
-    // if no asset_no provided, generate sequential one
-    const proceedWithAssetNo = (err, generated) => {
-      if (err) return res.status(500).json({ error: err.message });
-      asset_no = asset_no && String(asset_no).trim() ? String(asset_no).trim() : generated;
-      // continue validations
-      if (!asset_no || !isValidString(String(asset_no),1,50)) return res.status(400).json({ error: 'Invalid asset_no' });
-      if (!asset_type || !isValidString(asset_type,1,50)) return res.status(400).json({ error: 'Invalid asset_type' });
-      if (serial_no && typeof serial_no !== 'string') return res.status(400).json({ error: 'Invalid serial_no' });
-      if (manufacturer && typeof manufacturer !== 'string') return res.status(400).json({ error: 'Invalid manufacturer' });
-      if (model && typeof model !== 'string') return res.status(400).json({ error: 'Invalid model' });
-      if (version && typeof version !== 'string') return res.status(400).json({ error: 'Invalid version' });
-      if (os_info && typeof os_info !== 'string') return res.status(400).json({ error: 'Invalid os_info' });
-      if (!status || !isValidString(status,1,20)) return res.status(400).json({ error: 'Invalid status' });
-      db.run('INSERT INTO inventory (asset_no, asset_type, serial_no, manufacturer, model, version, os_info, status, department) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [asset_no, asset_type, serial_no, manufacturer, model, version, os_info || '', status, department], function(err) {
-        if (err) return res.status(400).json({ error: err.message });
-        const insertedId = this.lastID;
-        db.get('SELECT * FROM inventory WHERE id = ?', [insertedId], (e2, row) => {
-          if (e2) return res.status(500).json({ error: e2.message });
-          res.json(row);
-        });
-      });
-    };
 
-    if (!asset_no || (typeof asset_no === 'string' && asset_no.trim() === '')) {
-      // generate sequential asset number for this department
-      getNextAssetNumber(department, proceedWithAssetNo);
-    } else {
-      proceedWithAssetNo(null, asset_no);
-    }
-  });
+  const handleInsert = (deptToUse) => {
+    // ensure department exists (create if missing), then verify
+    db.run('INSERT OR IGNORE INTO departments (name) VALUES (?)', [deptToUse], (insErr) => {
+      if (insErr) return res.status(500).json({ error: insErr.message });
+
+      db.get('SELECT id FROM departments WHERE name = ?', [deptToUse], (dErr, dRow) => {
+        if (dErr) return res.status(500).json({ error: dErr.message });
+        if (!dRow) return res.status(400).json({ error: 'Department does not exist' });
+
+        // if no asset_no provided, generate sequential one
+        const proceedWithAssetNo = (err, generated) => {
+          if (err) return res.status(500).json({ error: err.message });
+          asset_no = asset_no && String(asset_no).trim() ? String(asset_no).trim() : generated;
+          // continue validations
+          if (!asset_no || !isValidString(String(asset_no),1,50)) return res.status(400).json({ error: 'Invalid asset_no' });
+          if (!asset_type || !isValidString(asset_type,1,50)) return res.status(400).json({ error: 'Invalid asset_type' });
+          if (serial_no && typeof serial_no !== 'string') return res.status(400).json({ error: 'Invalid serial_no' });
+          if (manufacturer && typeof manufacturer !== 'string') return res.status(400).json({ error: 'Invalid manufacturer' });
+          if (model && typeof model !== 'string') return res.status(400).json({ error: 'Invalid model' });
+          if (version && typeof version !== 'string') return res.status(400).json({ error: 'Invalid version' });
+          if (os_info && typeof os_info !== 'string') return res.status(400).json({ error: 'Invalid os_info' });
+          if (!status || !isValidString(status,1,20)) return res.status(400).json({ error: 'Invalid status' });
+          const received_at = new Date().toISOString();
+
+          db.run('INSERT INTO inventory (asset_no, asset_type, serial_no, manufacturer, model, version, os_info, status, department, received_at, replacement_of) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [asset_no, asset_type, serial_no, manufacturer, model, version, os_info || '', status, deptToUse, received_at, replacement_of || null], function(err) {
+            if (err) return res.status(400).json({ error: err.message });
+            const insertedId = this.lastID;
+            // if this item is a replacement of another, set replaced_by on the old item and mark old status
+            if (replacement_of) {
+              db.run('UPDATE inventory SET replaced_by = ?, status = ? WHERE id = ?', [insertedId, 'Replaced', replacement_of], (uErr) => { if (uErr) console.error('Failed to mark replaced_by/status:', uErr.message); });
+            }
+            db.get('SELECT * FROM inventory WHERE id = ?', [insertedId], (e2, row) => {
+              if (e2) return res.status(500).json({ error: e2.message });
+              res.json(row);
+            });
+          });
+        };
+
+        if (!asset_no || (typeof asset_no === 'string' && asset_no.trim() === '')) {
+          // generate sequential asset number for this department
+          getNextAssetNumber(deptToUse, proceedWithAssetNo);
+        } else {
+          proceedWithAssetNo(null, asset_no);
+        }
+      });
+    });
+  };
+
+  if (replacement_of) {
+    // ensure replacement_of exists and possibly inherit its department if new item has no department
+    db.get('SELECT * FROM inventory WHERE id = ?', [replacement_of], (rErr, old) => {
+      if (rErr) return res.status(500).json({ error: rErr.message });
+      if (!old) return res.status(400).json({ error: 'Item to replace not found' });
+      const deptToUse = (!department || department === '') ? (old.department || 'UNASSIGNED') : String(department).toUpperCase();
+      handleInsert(deptToUse);
+    });
+  } else {
+    const deptToUse = department && department !== '' ? String(department).toUpperCase() : 'UNASSIGNED';
+    handleInsert(deptToUse);
+  }
 });
 
 // Records receives items from ICT

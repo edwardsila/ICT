@@ -11,22 +11,55 @@ const Maintenance = () => {
     equipment_model: '',
     user: ''
   });
+  const [inventory_id, setInventoryId] = useState(null);
+  const [repair_notes, setRepairNotes] = useState('');
+  const [DEPARTMENTS, setDEPARTMENTS] = useState([]);
+  const [inventoryList, setInventoryList] = useState([]);
   const [message, setMessage] = useState('');
+  React.useEffect(() => {
+    async function loadDepts() {
+      try {
+        const res = await fetch('/api/departments', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) setDEPARTMENTS(data.map(d => d.name));
+        }
+      } catch (err) {
+        // ignore
+      }
+    }
+    loadDepts();
+  }, []);
   const handleChange = e => {
     setForm({ ...form, [e.target.name]: e.target.value });
+  };
+  const handleDeptSelect = async (dept) => {
+    setForm({ ...form, department: dept, inventory_id: null });
+    // fetch inventory for department
+    try {
+      const res = await fetch(`/api/inventory?department=${encodeURIComponent(dept)}`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setInventoryList(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      setInventoryList([]);
+    }
   };
   const handleSubmit = async e => {
     e.preventDefault();
     setMessage('');
     try {
+      const payload = { ...form, inventory_id: form.inventory_id || null, repair_notes: form.repair_notes || '' };
       const res = await fetch('/api/maintenance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form)
+        body: JSON.stringify(payload),
+        credentials: 'include'
       });
       if (res.ok) {
         setMessage('Record added successfully!');
-        setForm({ date: '', equipment: '', tagnumber: '', department: '', equipment_model: '', user: '' });
+        setForm({ date: '', equipment: '', tagnumber: '', department: '', equipment_model: '', user: '', inventory_id: null, repair_notes: '' });
       } else {
         const errorData = await res.json();
         setMessage(errorData.error ? `Failed to add record: ${errorData.error}` : 'Failed to add record.');
@@ -60,11 +93,30 @@ const Maintenance = () => {
               </div>
               <div className="col-md-6">
                 <label className="form-label">Department</label>
-                <input type="text" className="form-control" name="department" value={form.department} onChange={handleChange} placeholder="e.g. HR, Finance" required />
+                <div className="d-flex gap-2 flex-wrap">
+                  {DEPARTMENTS.map(d => (
+                    <button key={d} type="button" className={`btn btn-${form.department === d ? 'primary' : 'outline-primary'}`} onClick={() => handleDeptSelect(d)}>{d}</button>
+                  ))}
+                </div>
+                <div className="form-text">Select department to load inventory items below.</div>
               </div>
               <div className="col-md-6">
                 <label className="form-label">Equipment Model</label>
                 <input type="text" className="form-control" name="equipment_model" value={form.equipment_model} onChange={handleChange} placeholder="e.g. Dell Latitude 5400" required />
+              </div>
+              <div className="col-md-6">
+                <label className="form-label">Link Inventory Item (optional)</label>
+                <select className="form-select" name="inventory_id" value={form.inventory_id || ''} onChange={handleChange}>
+                  <option value="">-- New / Not in Inventory --</option>
+                  {inventoryList.map(it => (
+                    <option key={it.id} value={it.id}>{it.asset_no} — {it.model || it.asset_type}</option>
+                  ))}
+                </select>
+                <div className="form-text">Choose an existing inventory item for this maintenance record, if applicable.</div>
+              </div>
+              <div className="col-md-12">
+                <label className="form-label">Repair Notes (optional)</label>
+                <textarea className="form-control" name="repair_notes" value={form.repair_notes} onChange={handleChange} rows={3} />
               </div>
               <div className="col-md-6">
                 <label className="form-label">User of the Equipment</label>
