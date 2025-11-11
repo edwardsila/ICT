@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './App.css';
@@ -58,70 +58,11 @@ function ProtectedRoute({ element, adminOnly }) {
 }
 
 
-// MWALIMU National Sacco logo
 const mwalimuLogo = 'https://imgs.search.brave.com/f1dIw44rlZWslko55CbuopR9Ai9WhBhPKxWq2NsaqEU/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9wbGF5/LWxoLmdvb2dsZXVz/ZXJjb250ZW50LmNv/bS90aGRkZ1FCc0RD/dTRhTi1qX0V4a1VV/ZVRKNTRyOFBsaTI2/a3FqTU5mT29YYm9V/cXZQREtIX3hjdkZw/bEVyaXV4U2hyMz13/MjQwLWg0ODAtcnc';
 
 
 
-function ModernHome() {
-  return (
-    <div className="container py-5">
-      <div className="row justify-content-center mb-4">
-        <div className="col-md-8 text-center">
-          <img src={mwalimuLogo} alt="Mwalimu Sacco Logo" style={{height: '120px', maxWidth: '320px', marginBottom: '24px', borderRadius: '24px', boxShadow: '0 4px 24px rgba(31,38,135,0.25)', background: '#fff', padding: '12px'}} />
-          <h1 className="fw-bold mb-2" style={{color: '#1b5e20'}}>MNSS ICT Portal</h1>
-          <p className="lead" style={{color: '#333'}}>Welcome to the MWALIMU NATIONAL SACCO ICT SYSTEM. Manage inventory, maintenance, and reports with ease.</p>
-          {/* Modern search placed here on the Home screen */}
-          <div className="mt-4 d-flex justify-content-center">
-            <SearchBar placeholder="Search inventory, users, or reports..." />
-          </div>
-        </div>
-      </div>
-      <div className="row g-4 justify-content-center">
-        <div className="col-md-4">
-          <div className="card shadow h-100 text-center">
-            <div className="card-body">
-              <i className="bi bi-box-seam display-4 text-success mb-3"></i>
-              <h4 className="mb-2">Inventory</h4>
-              <p>Add all ICT equipment and assets.</p>
-              <Link to="/inventory" className="btn btn-success w-100">Add Inventory</Link>
-            </div>
-          </div>
-        </div>
-        <div className="col-md-4">
-          <div className="card shadow h-100 text-center">
-            <div className="card-body">
-              <i className="bi bi-tools display-4 text-warning mb-3"></i>
-              <h4 className="mb-2">Maintenance</h4>
-              <p>Log and review maintenance activities by floor.</p>
-              <Link to="/maintenance" className="btn btn-warning w-100">Go to Maintenance</Link>
-            </div>
-          </div>
-        </div>
-        <div className="col-md-4">
-          <div className="card shadow h-100 text-center">
-            <div className="card-body">
-              <i className="bi bi-bar-chart-line display-4 text-info mb-3"></i>
-              <h4 className="mb-2">Reports</h4>
-              <p>Generate and view reports for ICT operations.</p>
-              <Link to="/reports" className="btn btn-info w-100">Go to Reports</Link>
-            </div>
-          </div>
-        </div>
-        <div className="col-md-4">
-          <div className="card shadow h-100 text-center">
-            <div className="card-body">
-              <i className="bi bi-arrow-left-right display-4 text-secondary mb-3"></i>
-              <h4 className="mb-2">Transfers</h4>
-              <p>Send inventory items to other departments and track acknowledgments.</p>
-              <Link to="/transfers" className="btn btn-secondary w-100">Go to Transfers</Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+
 
 function App() {
   // Get current user
@@ -134,29 +75,190 @@ function App() {
   async function handleLogout() {
     try {
       await fetch('/api/logout', { method: 'POST', credentials: 'include' });
-    } catch {}
+    } catch (e) {}
     localStorage.removeItem('user');
     window.location.href = '/login';
   }
 
+  function ModernHome({ currentUser }) {
+  const [query, setQuery] = useState('');
+    const [stats, setStats] = useState({ total: '—', in_repair: '—', pending_transfers: '—' });
+    const [recent, setRecent] = useState([]);
+  // We'll use window.location for navigation from the hero
+
+    useEffect(() => {
+      // Fetch recent inventory and simple stats (best-effort)
+      (async () => {
+        try {
+          const [recentRes, invRes, transfersRes] = await Promise.allSettled([
+            fetch('/api/inventory/recent?limit=6', { credentials: 'include' }),
+            fetch('/api/inventory', { credentials: 'include' }),
+            fetch('/api/transfers', { credentials: 'include' })
+          ]);
+
+          if (recentRes.status === 'fulfilled' && recentRes.value.ok) {
+            const r = await recentRes.value.json(); setRecent(Array.isArray(r) ? r : []);
+          }
+          if (invRes.status === 'fulfilled' && invRes.value.ok) {
+            const inv = await invRes.value.json(); setStats(s => ({ ...s, total: Array.isArray(inv) ? inv.length : (inv?.length || '—') }));
+          }
+          if (transfersRes.status === 'fulfilled' && transfersRes.value.ok) {
+            const t = await transfersRes.value.json();
+            const pending = Array.isArray(t) ? t.filter(x => x.status !== 'Delivered' && x.status !== 'ReceivedByRecords').length : '—';
+            setStats(s => ({ ...s, pending_transfers: pending }));
+          }
+        } catch (err) {
+          // ignore, leave placeholders
+        }
+      })();
+    }, []);
+
+    const doNavigate = (path) => { window.location.href = path; };
+
+    const onSelect = (item) => {
+      if (!item) return;
+      if (item.id) doNavigate(`/inventory?itemId=${encodeURIComponent(item.id)}`);
+      else if (item.title) doNavigate(`/inventory?q=${encodeURIComponent(item.title)}`);
+    };
+
+    return (
+      <div>
+        <div className="hero-section py-5 position-relative">
+          <div className="hero-deco">
+            <svg viewBox="0 0 1200 240" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+              <g className="floating float-slow">
+                <path d="M0 120 C150 10 350 10 500 120 C650 230 850 230 1200 120 L1200 240 L0 240 Z" fill="#08a27a" />
+              </g>
+              <g className="floating float-fast">
+                <circle cx="160" cy="40" r="28" fill="#0fefc8" opacity="0.18" />
+                <circle cx="980" cy="90" r="18" fill="#ffffff" opacity="0.08" />
+              </g>
+            </svg>
+          </div>
+          <div className="container hero-content text-center text-light py-5 animate-shake">
+            <img className="animate-pop" src={mwalimuLogo} alt="Mwalimu Sacco Logo" style={{height: '100px', maxWidth: '280px', marginBottom: '16px', borderRadius: '16px', boxShadow: '0 8px 40px rgba(0,0,0,0.2)', background: 'rgba(255,255,255,0.95)', padding: '8px'}} />
+            <h1 className="fw-bold mb-2 text-gradient animate-fade-up" style={{fontSize: '2.6rem', animationDelay: '0.08s'}}>Mwalimu National ICT</h1>
+            <p className="lead mb-3 animate-fade-up" style={{maxWidth: '820px', margin: '0 auto', animationDelay: '0.12s'}}>A simple, fast system to manage your assets, maintenance and transfers. Secure, auditable and built for the MWALIMU community.</p>
+            <div className="d-flex justify-content-center mt-4">
+              <div style={{width: 760, maxWidth: '100%'}} className="d-flex gap-2">
+                <div style={{flex: 1}} className="stagger" aria-hidden style={{'--delay': '0.14s'}}>
+                  <SearchBar placeholder="Search inventory, users, or actions..." value={query} onQueryChange={setQuery} onSelect={onSelect} />
+                </div>
+                <div className="stagger-pop" style={{'--delay': '0.18s'}}>
+                  <button className="btn btn-primary btn-lg" onClick={() => doNavigate(`/inventory?q=${encodeURIComponent(query)}`)}>Search</button>
+                </div>
+              </div>
+            </div>
+              <div className="mt-4 d-flex justify-content-center gap-2">
+                <Link to="/inventory" className="btn btn-light btn-lg stagger-pop" style={{'--delay': '0.22s'}}>Add Inventory</Link>
+                <Link to="/maintenance" className="btn btn-outline-light btn-lg stagger-pop" style={{'--delay': '0.26s'}}>Maintenance</Link>
+                <Link to="/transfers" className="btn btn-outline-light btn-lg stagger-pop" style={{'--delay': '0.30s'}}>Transfers</Link>
+              </div>
+            <div className="mt-4 text-center hero-features">
+              <ul className="list-inline mb-0">
+                <li className="list-inline-item mx-3 text-light"><i className="bi bi-shield-check me-2"></i>Secure audits</li>
+                <li className="list-inline-item mx-3 text-light"><i className="bi bi-clock-history me-2"></i>Easy tracking</li>
+                <li className="list-inline-item mx-3 text-light"><i className="bi bi-people-fill me-2"></i>Sacco-friendly policies</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div className="container py-5">
+          <div className="row mb-4 g-3">
+            <div className="col-md-4">
+              <div className="stat-card p-3 text-center shadow-sm rounded">
+                <div className="h1 mb-0">{stats.total}</div>
+                <div className="small text-muted">Total assets</div>
+              </div>
+            </div>
+            <div className="col-md-4">
+              <div className="stat-card p-3 text-center shadow-sm rounded">
+                <div className="h1 mb-0">{stats.in_repair}</div>
+                <div className="small text-muted">In repair</div>
+              </div>
+            </div>
+            <div className="col-md-4">
+              <div className="stat-card p-3 text-center shadow-sm rounded">
+                <div className="h1 mb-0">{stats.pending_transfers}</div>
+                <div className="small text-muted">Pending transfers</div>
+              </div>
+            </div>
+          </div>
+
+          <h4 className="mb-3">Quick access</h4>
+            <div className="row g-4 justify-content-center">
+            <div className="col-md-4">
+              <div className="card interactive-card shadow h-100 text-center stagger-pop" style={{'--delay': '0.34s'}}>
+                <div className="card-body">
+                  <i className="bi bi-box-seam display-4 text-success mb-3"></i>
+                  <h4 className="mb-2">Inventory</h4>
+                  <p>Add and manage ICT equipment.</p>
+                  <Link to="/inventory" className="btn btn-success w-100">Manage Inventory</Link>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-4">
+              <div className="card interactive-card shadow h-100 text-center stagger-pop" style={{'--delay': '0.38s'}}>
+                <div className="card-body">
+                  <i className="bi bi-tools display-4 text-warning mb-3"></i>
+                  <h4 className="mb-2">Maintenance</h4>
+                  <p>Log and review maintenance activities.</p>
+                  <Link to="/maintenance" className="btn btn-warning w-100">Go to Maintenance</Link>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-4">
+              <div className="card interactive-card shadow h-100 text-center stagger-pop" style={{'--delay': '0.42s'}}>
+                <div className="card-body">
+                  <i className="bi bi-arrow-left-right display-4 text-secondary mb-3"></i>
+                  <h4 className="mb-2">Transfers</h4>
+                  <p>Track and send items between departments.</p>
+                  <Link to="/transfers" className="btn btn-secondary w-100">Go to Transfers</Link>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <h4 className="mt-5 mb-3">Recent items</h4>
+          <div className="row g-3">
+            {recent.length === 0 && (
+              <div className="col-12"><div className="text-muted">No recent items to show.</div></div>
+            )}
+            {recent.map((item, idx) => (
+              <div className="col-md-4" key={item.id}>
+                <div className="card small-card h-100 stagger" style={{'--delay': `${0.44 + idx * 0.04}s`}}>
+                  <div className="card-body d-flex align-items-start">
+                    <div className="me-3">
+                      <i className="bi bi-hdd display-6 text-primary"></i>
+                    </div>
+                    <div>
+                      <div className="fw-bold">{item.asset_no || item.asset_type}</div>
+                      <div className="small text-muted">{item.manufacturer || ''} {item.model || ''}</div>
+                      <div className="mt-2"><Link to={`/inventory?itemId=${item.id}`} className="stretched-link">View</Link></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <Router>
       <div className="app-flex-layout d-flex flex-column min-vh-100">
-        {/* Navigation Bar */}
         <nav className="navbar navbar-expand-md navbar-dark mwalimu-navbar shadow">
           <div className="container-fluid d-flex align-items-center">
-            {/* Brand left with logo */}
             <Link className="navbar-brand d-flex align-items-center me-3" to="/">
               <img src={mwalimuLogo} alt="Mwalimu Sacco Logo" style={{height: '40px', marginRight: '10px', borderRadius: '8px', background: 'rgba(27,94,32,0.9)', padding: '4px', border: '2px solid #fbc02d'}} />
-              <span className="fw-bold fs-2" style={{color: '#fbc02d'}}>MWALIMU ICT</span>
+              <span className="fw-bold fs-2" style={{color: '#fbc02d'}}>ICT</span>
             </Link>
-            {/* Spacer to push nav links right */}
             <div className="flex-grow-1"></div>
-            {/* Responsive navbar toggler */}
             <button className="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar" aria-controls="mainNavbar" aria-expanded="false" aria-label="Toggle navigation">
               <span className="navbar-toggler-icon"></span>
             </button>
-            {/* Navbar links and account dropdown right aligned */}
             <div className="collapse navbar-collapse justify-content-end" id="mainNavbar">
               <ul className="navbar-nav gap-2">
                 <li className="nav-item">
@@ -168,17 +270,18 @@ function App() {
                 <li className="nav-item">
                   <Link className="nav-link" to="/maintenance">Maintenance</Link>
                 </li>
-                {/* Transfers link removed - accessible from Home page */}
-                <li className="nav-item">
-                  <Link className="nav-link" to="/reports">Reports</Link>
-                </li>
                 {currentUser?.role === 'admin' && (
-                  <li className="nav-item">
-                    <Link className="nav-link fw-bold text-warning" to="/admin"><i className="bi bi-speedometer2"></i> Dashboard</Link>
-                  </li>
+                  <>
+                    <li className="nav-item">
+                      <Link className="nav-link fw-bold text-warning" to="/admin"><i className="bi bi-speedometer2"></i> Dashboard</Link>
+                    </li>
+                    <li className="nav-item">
+                      <Link className="nav-link" to="/reports">Reports</Link>
+                    </li>
+                  </>
                 )}
               </ul>
-              {/* Account dropdown menu */}
+              {/* Account dropdown */}
               {isLoggedIn() ? (
                 <div className="d-flex align-items-center gap-2 ms-3">
                   <span className="text-light fw-bold"><i className="bi bi-person-circle me-1"></i>{currentUser?.username}</span>
@@ -186,9 +289,7 @@ function App() {
                 </div>
               ) : (
                 <Dropdown className="ms-3">
-                  <Dropdown.Toggle variant="outline-light" id="dropdown-user">
-                    Account
-                  </Dropdown.Toggle>
+                  <Dropdown.Toggle variant="outline-light" id="dropdown-user">Account</Dropdown.Toggle>
                   <Dropdown.Menu align="end">
                     <Dropdown.Item as={Link} to="/admin">Admin</Dropdown.Item>
                     <Dropdown.Item as={Link} to="/login">Login</Dropdown.Item>
@@ -203,7 +304,7 @@ function App() {
         {/* Page Content */}
         <div className="flex-grow-1">
           <Routes>
-            <Route path="/" element={<ModernHome />} />
+            <Route path="/" element={<ModernHome currentUser={currentUser} />} />
             <Route path="/inventory" element={<ProtectedRoute element={<Inventory />} />} />
             <Route path="/maintenance" element={<ProtectedRoute element={<Maintenance />} />} />
             <Route path="/reports" element={<ProtectedRoute element={<ReportsMessageWrapper />} adminOnly={true} />} />

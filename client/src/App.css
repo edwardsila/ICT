@@ -76,6 +76,137 @@
   color: #61dafb;
 }
 
+/* Hero tweaks */
+.hero-section {
+  background: linear-gradient(135deg, #0f172a 0%, #0b3d2e 50%);
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+}
+.hero-section .lead { color: rgba(255,255,255,0.9); }
+.stat-card { background: rgba(255,255,255,0.04); }
+.interactive-card { transition: transform .18s ease, box-shadow .18s ease; }
+.interactive-card:hover { transform: translateY(-6px); box-shadow: 0 12px 30px rgba(2,6,23,0.35); }
+.small-card { transition: transform .12s ease; }
+.small-card:hover { transform: translateY(-4px); }
+
+/* Hero decorative wave */
+.hero-section::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -20px;
+  height: 120px;
+  background: radial-gradient(closest-side at 20% 20%, rgba(255,255,255,0.06), transparent 40%), radial-gradient(closest-side at 80% 80%, rgba(255,255,255,0.04), transparent 40%);
+  transform: skewY(-3deg);
+  pointer-events: none;
+}
+
+.hero-features .list-inline-item { font-size: 0.95rem; opacity: 0.95; }
+.hero-features .bi { font-size: 1.05rem; vertical-align: -2px; }
+
+/* Buttons */
+.hero-section .btn-light { background: rgba(255,255,255,0.95); color: #0b3d2e; }
+.hero-section .btn-outline-light { border-color: rgba(255,255,255,0.35); color: rgba(255,255,255,0.95); }
+.hero-section .btn-outline-light:hover { color: #0b3d2e; background: rgba(255,255,255,0.9); }
+
+/* Responsive tweaks */
+@media (max-width: 768px) {
+  .hero-section { padding: 2.5rem 1rem; }
+  .hero-section img { height: 80px !important; }
+  .hero-section .btn-lg { font-size: 0.95rem; padding: 0.6rem 1rem; }
+}
+
+/* Floating decorative elements */
+.hero-deco { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.hero-deco svg { width: 100%; height: 100%; opacity: 0.18; mix-blend-mode: screen; }
+.floating { animation: float 6s ease-in-out infinite alternate; }
+.float-slow { animation-duration: 10s; }
+.float-fast { animation-duration: 4.5s; }
+
+/* Search focus highlight */
+.search-bar .form-control:focus {
+  box-shadow: 0 8px 30px rgba(11,61,46,0.14);
+  border-color: rgba(255,255,255,0.8);
+}
+
+/* Card gradients */
+.interactive-card { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius: 12px; }
+.stat-card { background: linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)); border-radius: 12px; }
+.small-card { border-radius: 10px; }
+
+/* Icon pop on hover */
+.interactive-card .bi { transition: transform .18s ease, color .18s ease; }
+.interactive-card:hover .bi { transform: translateY(-6px) scale(1.06); color: #0b3d2e; }
+
+/* Gentle backdrop for hero content to improve contrast */
+.hero-content { position: relative; z-index: 2; }
+.hero-section::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(3,10,7,0.18), rgba(3,10,7,0.06)); z-index: 0; pointer-events: none; }
+
+/* Slight glass effect for hero buttons */
+.hero-section .btn { border-radius: 10px; }
+
+/* Entry animations */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes popIn {
+  0% { opacity: 0; transform: scale(.96) translateY(6px); }
+  60% { opacity: 1; transform: scale(1.02) translateY(-2px); }
+  100% { transform: scale(1) translateY(0); }
+}
+
+@keyframes floatWide {
+  0% { transform: translateY(0px); }
+  100% { transform: translateY(-14px); }
+}
+
+/* Slower entry animations for a more relaxed feel */
+.floating { animation: floatWide 10s ease-in-out infinite alternate; }
+
+/* Subtle entry animations that don't hide content (no initial opacity 0) */
+@keyframes subtleUp {
+  from { transform: translateY(8px); }
+  to { transform: translateY(0); }
+}
+
+@keyframes subtlePop {
+  0% { transform: translateY(6px) scale(.98); }
+  60% { transform: translateY(-2px) scale(1.02); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+.animate-fade-up { animation: subtleUp 1s cubic-bezier(.22,.9,.35,1) both; }
+.animate-pop { animation: subtlePop .85s cubic-bezier(.22,.9,.35,1) both; }
+
+/* Stagger helpers: set inline style --delay to stagger elements (no hiding) */
+.stagger { opacity: 1; transform: translateY(0); animation: subtleUp 1s ease forwards; animation-delay: var(--delay, 0s); }
+.stagger-pop { opacity: 1; transform: translateY(0) scale(1); animation: subtlePop .85s ease forwards; animation-delay: var(--delay, 0s); }
+
+/* Small shake animation for initial attention (doesn't hide content) */
+@keyframes shake {
+  0% { transform: translateY(0) rotate(0); }
+  20% { transform: translateY(-4px) rotate(-0.8deg); }
+  40% { transform: translateY(0) rotate(0.5deg); }
+  60% { transform: translateY(-2px) rotate(-0.4deg); }
+  80% { transform: translateY(0) rotate(0.2deg); }
+  100% { transform: translateY(0) rotate(0); }
+}
+
+.animate-shake { animation: shake .9s ease-in-out both; }
+
+/* Suggestion dropdown animation */
+.search-bar .suggestions { transition: opacity .18s ease, transform .18s ease; transform-origin: top center; }
+.search-bar .suggestions.card { opacity: 0; transform: translateY(6px) scale(.995); }
+.search-bar .suggestions.card.show { opacity: 1; transform: translateY(0) scale(1); }
+
+/* Recent items subtle hover */
+.small-card:hover { box-shadow: 0 18px 40px rgba(2,6,23,0.12); transform: translateY(-6px); transition: transform .18s ease, box-shadow .18s ease; }
+
+
 @keyframes App-logo-spin {
   from {
     transform: rotate(0deg);

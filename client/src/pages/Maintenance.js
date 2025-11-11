@@ -186,7 +186,7 @@ const Maintenance = () => {
                     <input type="text" className="form-control" name="equipment" value={form.equipment} readOnly />
                   </div>
                   <div className="col-md-6">
-                    <label className="form-label">Tag Number</label>
+                    <label className="form-label">Tag Number(MNSSXXX)</label>
                     <div className="d-flex gap-2">
                       <div style={{flex: 1}}>
                         <SearchBar
@@ -290,12 +290,6 @@ const Maintenance = () => {
             <button type="submit" className="btn btn-success mt-3 w-100">Add Record</button>
           </form>
           {message && <div className="alert alert-info mt-3">{message} {lastNotFoundTag && (<Link to={`/inventory?serial=${encodeURIComponent(lastNotFoundTag)}`} className="btn btn-link">Add device</Link>)}</div>}
-        </div>
-      </div>
-      <div className="card shadow">
-        <div className="card-body">
-          <p>Maintenance records will appear here. You can add, view, edit, or delete maintenance entries.</p>
-          {/* TODO: Add maintenance table and CRUD actions */}
         </div>
       </div>
     </div>

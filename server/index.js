@@ -3,6 +3,7 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const SALT_ROUNDS = 10;
 const sqlite3 = require('sqlite3').verbose();
+const fs = require('fs');
 const cors = require('cors');
 const path = require('path');
 
@@ -89,6 +90,28 @@ const createTables = (cb) => {
       destination_received_at TEXT,
       FOREIGN KEY (inventory_id) REFERENCES inventory(id)
     )`);
+
+    // Ensure transfers table has columns for branch repair tracking
+    db.serialize(() => {
+      db.all("PRAGMA table_info(transfers)", [], (err, cols) => {
+        if (err) {
+          console.error('Failed to read transfers table info', err);
+          return;
+        }
+        const colNames = (cols || []).map(c => c.name);
+        const toAdd = [];
+        if (!colNames.includes('date_received')) toAdd.push("ALTER TABLE transfers ADD COLUMN date_received TEXT");
+        if (!colNames.includes('date_sent')) toAdd.push("ALTER TABLE transfers ADD COLUMN date_sent TEXT");
+  if (!colNames.includes('transfer_type')) toAdd.push("ALTER TABLE transfers ADD COLUMN transfer_type TEXT");
+        if (!colNames.includes('repaired_status')) toAdd.push("ALTER TABLE transfers ADD COLUMN repaired_status TEXT");
+        if (!colNames.includes('repaired_by')) toAdd.push("ALTER TABLE transfers ADD COLUMN repaired_by TEXT");
+        if (!colNames.includes('repair_comments')) toAdd.push("ALTER TABLE transfers ADD COLUMN repair_comments TEXT");
+  if (!colNames.includes('received_by')) toAdd.push("ALTER TABLE transfers ADD COLUMN received_by TEXT");
+  if (!colNames.includes('issue_comments')) toAdd.push("ALTER TABLE transfers ADD COLUMN issue_comments TEXT");
+  if (!colNames.includes('replacement_inventory_id')) toAdd.push("ALTER TABLE transfers ADD COLUMN replacement_inventory_id INTEGER");
+        toAdd.forEach(sql => { db.run(sql, (aErr) => { if (aErr) console.error('Failed to alter transfers table:', aErr.message); }); });
+      });
+    });
 
     // Departments table
     db.run(`CREATE TABLE IF NOT EXISTS departments (
@@ -234,6 +257,44 @@ function requireLogin(req, res, next) {
   if (!req.session || !req.session.user) return res.status(401).json({ error: 'Login required' });
   next();
 }
+
+// Transfers logging middleware: write incoming requests and responses to a log file for debugging
+const TRANSFERS_LOG = '/tmp/ict_transfers.log';
+app.use('/api/transfers', (req, res, next) => {
+  try {
+    const entry = {
+      time: new Date().toISOString(),
+      method: req.method,
+      url: req.originalUrl,
+      user: req.session?.user?.username || null,
+      body: req.body || null,
+      query: req.query || null
+    };
+    fs.appendFile(TRANSFERS_LOG, JSON.stringify({ event: 'request', ...entry }) + '\n', () => {});
+    // log response status when finished
+    res.on('finish', () => {
+      const resp = { time: new Date().toISOString(), method: req.method, url: req.originalUrl, status: res.statusCode, user: req.session?.user?.username || null };
+      fs.appendFile(TRANSFERS_LOG, JSON.stringify({ event: 'response', ...resp }) + '\n', () => {});
+    });
+  } catch (e) {
+    // ignore logging failures
+  }
+  next();
+});
+
+// Debug endpoint: receive a client-side debug payload and log it server-side (for terminal visibility)
+// Public debug endpoint: receives a client-side debug payload and log it server-side (for terminal visibility)
+app.post('/api/transfers/debug', (req, res) => {
+  try {
+    const entry = { time: new Date().toISOString(), user: req.session?.user?.username || null, body: req.body };
+    fs.appendFile('/tmp/ict_transfers.log', JSON.stringify({ event: 'client-debug', ...entry }) + '\n', () => {});
+    console.log('CLIENT DEBUG TRANSFER:', JSON.stringify(entry, null, 2));
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Failed to write debug transfer log', err);
+    res.status(500).json({ error: 'Failed to log debug' });
+  }
+});
 
 // Inventory CRUD
 app.get('/api/inventory', requireLogin, (req, res) => {
@@ -660,3 +721,169 @@ app.post('/api/transfers/:id/acknowledge', requireLogin, (req, res) => {
 });
 
 app.get('/api/transfers/:id', requireLogin, (req, res) => { const { id } = req.params; if (!id || isNaN(Number(id))) return res.status(400).json({ error: 'Invalid transfer id' }); const sql = `SELECT t.*, i.asset_no, i.asset_type, i.serial_no as item_serial_no, i.manufacturer as item_manufacturer, i.model as item_model, i.version as item_version, i.department as item_department FROM transfers t LEFT JOIN inventory i ON t.inventory_id = i.id WHERE t.id = ?`; db.get(sql, [id], (err, row) => { if (err) return res.status(500).json({ error: err.message }); if (!row) return res.status(404).json({ error: 'Transfer not found' }); res.json(row); }); });
+
+// Create a transfer record (incoming from branch or internal transfer)
+app.post('/api/transfers', requireLogin, (req, res) => {
+  // Accept branch-specific fields: repaired_status, repaired_by, repair_comments, date_received, date_sent
+  const { inventory_id, from_department, to_department, destination, notes, transfer_type, repaired_status, repaired_by, repair_comments, date_received, date_sent, received_by, issue_comments, replacement_inventory_id } = req.body;
+  if (!inventory_id || isNaN(Number(inventory_id))) return res.status(400).json({ error: 'Invalid inventory_id' });
+  if (!from_department || typeof from_department !== 'string' || from_department.length < 1) return res.status(400).json({ error: 'Invalid from_department' });
+  if (!to_department || typeof to_department !== 'string' || to_department.length < 1) return res.status(400).json({ error: 'Invalid to_department' });
+  // optional validations for repair fields
+  const repairedStatusVal = (typeof repaired_status === 'string' && repaired_status.length > 0) ? repaired_status : null;
+  const repairedByVal = (typeof repaired_by === 'string' && repaired_by.length > 0) ? repaired_by : null;
+  const repairCommentsVal = (typeof repair_comments === 'string' && repair_comments.length > 0) ? repair_comments : null;
+  const dateReceivedVal = (typeof date_received === 'string' && date_received.length > 0) ? date_received : null;
+  const dateSentVal = (typeof date_sent === 'string' && date_sent.length > 0) ? date_sent : null;
+
+  // verify inventory exists
+  db.get('SELECT * FROM inventory WHERE id = ?', [inventory_id], (iErr, item) => {
+    if (iErr) return res.status(500).json({ error: iErr.message });
+    if (!item) return res.status(400).json({ error: 'Inventory item not found' });
+    const sent_by = req.session?.user?.username || 'Unknown';
+    const sent_at = new Date().toISOString();
+  const sql = 'INSERT INTO transfers (inventory_id, from_department, to_department, destination, transfer_type, sent_by, sent_at, status, notes, date_received, date_sent, repaired_status, repaired_by, repair_comments, received_by, issue_comments, replacement_inventory_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+  const params = [inventory_id, String(from_department).toUpperCase(), String(to_department).toUpperCase(), destination || null, transfer_type || null, sent_by, sent_at, 'Sent', notes || '', dateReceivedVal, dateSentVal, repairedStatusVal, repairedByVal, repairCommentsVal, (typeof received_by === 'string' ? received_by : null), (typeof issue_comments === 'string' ? issue_comments : null), (replacement_inventory_id ? replacement_inventory_id : null)];
+    db.run(sql, params, function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      const transferId = this.lastID;
+      // If this is an internal replacement and replacement info was provided, perform replacement immediately
+      if (String(transfer_type) === 'internal' && (replacement_inventory_id || req.body.replacement_details)) {
+        // reuse logic similar to complete-replacement
+        const repId = replacement_inventory_id || null;
+        const repDetails = req.body.replacement_details || null;
+        // fetch transfer row to get inventory_id and from_department
+        db.get('SELECT * FROM transfers WHERE id = ?', [transferId], (tErr, tRow) => {
+          if (tErr) { console.error('Failed to fetch transfer after insert', tErr); return res.json({ id: transferId }); }
+          const faultyId = tRow.inventory_id;
+          const originalDept = tRow.from_department || 'UNASSIGNED';
+          const actor = req.session?.user?.username || 'Unknown';
+          const now = new Date().toISOString();
+
+          const finalizeReplacement = (newInventoryId) => {
+            db.run('UPDATE inventory SET status = ?, department = ? WHERE id = ?', ['In ICT', 'UNASSIGNED', faultyId], (uErr) => { if (uErr) console.error('Failed to mark faulty inventory:', uErr.message); });
+            db.run('UPDATE inventory SET replacement_of = ? WHERE id = ?', [faultyId, newInventoryId], (uErr2) => { if (uErr2) console.error('Failed to set replacement_of on new item:', uErr2.message); });
+            db.run('UPDATE inventory SET replaced_by = ? WHERE id = ?', [newInventoryId, faultyId], (uErr3) => { if (uErr3) console.error('Failed to set replaced_by on faulty item:', uErr3.message); });
+            db.run('UPDATE transfers SET status = ?, destination_received_by = ?, destination_received_at = ?, records_notes = COALESCE(records_notes, "") || ? WHERE id = ?', ['Replaced', actor, now, '\nReplacement processed by ' + actor, transferId], function(err2) { if (err2) console.error('Failed to update transfer after replacement', err2.message); });
+          };
+
+          if (repId) {
+            db.get('SELECT * FROM inventory WHERE id = ?', [repId], (rErr, rep) => {
+              if (rErr) { console.error(rErr); return res.json({ id: transferId }); }
+              if (!rep) return res.json({ id: transferId, warning: 'Replacement inventory not found' });
+              db.run('UPDATE inventory SET department = ?, status = ? WHERE id = ?', [originalDept, 'Active', repId], (upErr) => { if (upErr) console.error('Failed to assign replacement inventory department:', upErr.message); finalizeReplacement(repId); });
+            });
+          } else if (repDetails && typeof repDetails === 'object') {
+            getNextAssetNumber(originalDept, (gErr, generated) => {
+              if (gErr) { console.error(gErr); return res.json({ id: transferId }); }
+              const asset_no = generated;
+              const asset_type = repDetails.asset_type || 'Laptop';
+              const serial_no = repDetails.serial_no || null;
+              const manufacturer = repDetails.manufacturer || null;
+              const model = repDetails.model || null;
+              const version = repDetails.version || null;
+              const os_info = repDetails.os_info || null;
+              const status = repDetails.status || 'Active';
+              const received_at = new Date().toISOString();
+              db.run('INSERT INTO inventory (asset_no, asset_type, serial_no, manufacturer, model, version, os_info, status, department, received_at, replacement_of) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [asset_no, asset_type, serial_no, manufacturer, model, version, os_info || '', status, originalDept, received_at, faultyId], function(insErr) {
+                if (insErr) { console.error(insErr); return res.json({ id: transferId }); }
+                const newId = this.lastID;
+                db.run('UPDATE inventory SET replaced_by = ? WHERE id = ?', [newId, faultyId], (uErr) => { if (uErr) console.error('Failed to set replaced_by on faulty item:', uErr.message); });
+                finalizeReplacement(newId);
+              });
+            });
+          }
+        });
+      }
+      return res.json({ id: transferId });
+    });
+  });
+});
+
+// List transfers (optional filter by status)
+app.get('/api/transfers', requireLogin, (req, res) => {
+  const status = req.query.status;
+  let sql = `SELECT t.*, i.asset_no, i.asset_type, i.serial_no as item_serial_no, i.department as item_department FROM transfers t LEFT JOIN inventory i ON t.inventory_id = i.id`;
+  const params = [];
+  if (status) { sql += ' WHERE t.status = ?'; params.push(status); }
+  sql += ' ORDER BY t.sent_at DESC LIMIT 200';
+  db.all(sql, params, (err, rows) => { if (err) return res.status(500).json({ error: err.message }); res.json(rows || []); });
+});
+
+// Mark transfer as received by ICT (move item into ICT/UNASSIGNED pool)
+app.post('/api/transfers/:id/receive-ict', requireLogin, (req, res) => {
+  const { id } = req.params;
+  const { records_notes } = req.body;
+  if (!id || isNaN(Number(id))) return res.status(400).json({ error: 'Invalid transfer id' });
+  const username = req.session?.user?.username || 'Unknown';
+  const received_at = new Date().toISOString();
+  // update transfer status
+  db.get('SELECT * FROM transfers WHERE id = ?', [id], (tErr, tRow) => {
+    if (tErr) return res.status(500).json({ error: tErr.message });
+    if (!tRow) return res.status(404).json({ error: 'Transfer not found' });
+    // set inventory department to UNASSIGNED and mark received_at on inventory
+    db.run('UPDATE inventory SET department = ?, received_at = ? WHERE id = ?', ['UNASSIGNED', received_at, tRow.inventory_id], (uErr) => {
+      if (uErr) console.error('Failed to update inventory on receive-ict:', uErr.message);
+      db.run('UPDATE transfers SET status = ?, records_received_by = ?, records_received_at = ?, records_notes = ? WHERE id = ?', ['ReceivedByICT', username, received_at, records_notes || '', id], function(err) { if (err) return res.status(500).json({ error: err.message }); res.json({ updated: this.changes }); });
+    });
+  });
+});
+
+// Complete an internal replacement: assign a replacement inventory (existing or new) to replace the faulty item
+app.post('/api/transfers/:id/complete-replacement', requireLogin, (req, res) => {
+  const { id } = req.params;
+  const { replacement_inventory_id, replacement_details } = req.body; // replacement_details: { asset_type, serial_no, manufacturer, model, version, os_info, status }
+  if (!id || isNaN(Number(id))) return res.status(400).json({ error: 'Invalid transfer id' });
+  db.get('SELECT t.*, i.* FROM transfers t LEFT JOIN inventory i ON t.inventory_id = i.id WHERE t.id = ?', [id], (tErr, row) => {
+    if (tErr) return res.status(500).json({ error: tErr.message });
+    if (!row) return res.status(404).json({ error: 'Transfer not found' });
+    const faultyId = row.inventory_id;
+    const originalDept = row.from_department || (row.department || 'UNASSIGNED');
+    const actor = req.session?.user?.username || 'Unknown';
+    const now = new Date().toISOString();
+
+    const finalizeReplacement = (newInventoryId) => {
+      // mark the faulty item as In ICT (or Replaced) and set replaced_by on faulty
+      db.run('UPDATE inventory SET status = ?, department = ? WHERE id = ?', ['In ICT', 'UNASSIGNED', faultyId], (uErr) => { if (uErr) console.error('Failed to mark faulty inventory:', uErr.message); });
+      db.run('UPDATE inventory SET replacement_of = ? WHERE id = ?', [faultyId, newInventoryId], (uErr2) => { if (uErr2) console.error('Failed to set replacement_of on new item:', uErr2.message); });
+      db.run('UPDATE inventory SET replaced_by = ? WHERE id = ?', [newInventoryId, faultyId], (uErr3) => { if (uErr3) console.error('Failed to set replaced_by on faulty item:', uErr3.message); });
+      // update transfer record
+      db.run('UPDATE transfers SET status = ?, destination_received_by = ?, destination_received_at = ?, records_notes = COALESCE(records_notes, "") || ? WHERE id = ?', ['Replaced', actor, now, '\nReplacement processed by ' + actor, id], function(err) { if (err) return res.status(500).json({ error: err.message }); res.json({ transfer_updated: this.changes, replacement_id: newInventoryId }); });
+    };
+
+    if (replacement_inventory_id) {
+      // Use an existing inventory item as replacement
+      db.get('SELECT * FROM inventory WHERE id = ?', [replacement_inventory_id], (rErr, rep) => {
+        if (rErr) return res.status(500).json({ error: rErr.message });
+        if (!rep) return res.status(400).json({ error: 'Replacement inventory not found' });
+        // assign replacement to original department/user
+        db.run('UPDATE inventory SET department = ?, status = ? WHERE id = ?', [originalDept, 'Active', replacement_inventory_id], (upErr) => { if (upErr) return res.status(500).json({ error: upErr.message }); finalizeReplacement(replacement_inventory_id); });
+      });
+    } else if (replacement_details && typeof replacement_details === 'object') {
+      // create a new inventory item and link it
+      const deptToUse = originalDept || 'UNASSIGNED';
+      // generate asset_no for dept
+      getNextAssetNumber(deptToUse, (gErr, generated) => {
+        if (gErr) return res.status(500).json({ error: gErr.message });
+        const asset_no = generated;
+        const asset_type = replacement_details.asset_type || 'Laptop';
+        const serial_no = replacement_details.serial_no || null;
+        const manufacturer = replacement_details.manufacturer || null;
+        const model = replacement_details.model || null;
+        const version = replacement_details.version || null;
+        const os_info = replacement_details.os_info || null;
+        const status = replacement_details.status || 'Active';
+        const received_at = new Date().toISOString();
+        db.run('INSERT INTO inventory (asset_no, asset_type, serial_no, manufacturer, model, version, os_info, status, department, received_at, replacement_of) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [asset_no, asset_type, serial_no, manufacturer, model, version, os_info || '', status, deptToUse, received_at, faultyId], function(insErr) {
+          if (insErr) return res.status(500).json({ error: insErr.message });
+          const newId = this.lastID;
+          // mark faulty as replaced_by
+          db.run('UPDATE inventory SET replaced_by = ? WHERE id = ?', [newId, faultyId], (uErr) => { if (uErr) console.error('Failed to set replaced_by on faulty item:', uErr.message); });
+          finalizeReplacement(newId);
+        });
+      });
+    } else {
+      return res.status(400).json({ error: 'Provide either replacement_inventory_id or replacement_details' });
+    }
+  });
+});

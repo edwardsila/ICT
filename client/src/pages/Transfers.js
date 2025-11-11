@@ -1,31 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import SearchBar from '../components/SearchBar';
 
 const Transfers = () => {
-  const [inventory, setInventory] = useState([]);
   const [transfers, setTransfers] = useState([]);
-  const [form, setForm] = useState({ inventory_id: '', to_department: '', destination: '', notes: '' });
+  const [form, setForm] = useState({ inventory_id: '', from_department: '', to_department: '', transfer_type: '', destination: '', notes: '', repaired_status: 'not_repaired', repaired_by: '', repair_comments: '', date_received: '', date_sent: '' });
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [replacementInventoryId, setReplacementInventoryId] = useState(null);
+  const [replacementDetails, setReplacementDetails] = useState(null);
 
-  const DEPARTMENTS = ['Records', 'ICT', 'Finance', 'HR', 'Procurement', 'Transport', 'Security', 'Registry', 'General'];
+  // Departments list not required for branch-first flow (kept on server side)
 
   useEffect(() => {
-    fetchInventory();
     fetchTransfers();
   }, []);
 
-  const fetchInventory = async () => {
-    try {
-      const res = await fetch('/api/inventory', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        setInventory(data);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  
 
   const fetchTransfers = async () => {
     try {
@@ -43,31 +34,120 @@ const Transfers = () => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
+  const handleSelectInventory = (item) => {
+    if (!item || !item.id) return;
+    setForm(f => ({ ...f, inventory_id: item.id }));
+  };
+
   const handleSend = async e => {
     e.preventDefault();
     setMessage('');
     const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const payload = { ...form, from_department: 'ICT', sent_by: user?.username || 'Unknown' };
+    // Build payload depending on transfer type
+    let payload = { transfer_type: form.transfer_type, sent_by: user?.username || 'Unknown', from_department: form.from_department || 'UNASSIGNED' };
+    if (form.transfer_type === 'branch') {
+      // Convert datetime-local inputs to ISO if present
+      const toIso = v => { try { return v ? new Date(v).toISOString() : null; } catch { return null; } };
+      payload = {
+        ...payload,
+        inventory_id: form.inventory_id || null,
+        repaired_status: form.repaired_status,
+        repaired_by: form.repaired_by || '',
+        repair_comments: form.repair_comments || '',
+        date_received: toIso(form.date_received) || null,
+        date_sent: toIso(form.date_sent) || null,
+        destination: form.destination || '',
+        notes: form.notes || ''
+      };
+    } else if (form.transfer_type === 'internal') {
+      const toIso = v => { try { return v ? new Date(v).toISOString() : null; } catch { return null; } };
+      payload = {
+        ...payload,
+        inventory_id: form.inventory_id || null,
+        date_received: toIso(form.date_received) || null,
+        received_by: form.received_by || '',
+        issue_comments: form.issue_comments || '',
+        to_department: form.to_department || '',
+        replacement_inventory_id: replacementInventoryId || null,
+        replacement_details: replacementInventoryId ? null : (replacementDetails || null),
+        notes: form.notes || ''
+      };
+    } else {
+      // Fallback generic payload
+      payload = { ...payload, inventory_id: form.inventory_id || null, to_department: form.to_department || '', destination: form.destination || '', notes: form.notes || '' };
+    }
+
     try {
       setLoading(true);
+      // For branch transfers: log payload to browser console and send a debug copy to the server so it prints to the server terminal/log
+      if (form.transfer_type === 'branch') {
+        try {
+          console.log('Branch transfer payload:', payload);
+        } catch (err) {
+          // ignore console errors
+        }
+        try {
+          fetch('/api/transfers/debug', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(payload) }).catch(() => {});
+        } catch (err) {
+          // ignore debug failures
+        }
+      }
       const res = await fetch('/api/transfers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload)
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(payload)
       });
       if (res.ok) {
         setMessage('Transfer logged successfully.');
-        setForm({ inventory_id: '', to_department: '', notes: '' });
+        setForm({ inventory_id: '', from_department: '', to_department: '', transfer_type: '', destination: '', notes: '', repaired_status: 'not_repaired', repaired_by: '', repair_comments: '', date_received: '', date_sent: '' });
         fetchTransfers();
       } else {
-        const err = await res.json();
-        setMessage(err.error || 'Failed to create transfer.');
+        const err = await res.json(); setMessage(err.error || 'Failed to create transfer.');
       }
     } catch (err) {
       setMessage('Error connecting to server.');
     }
     setLoading(false);
+  };
+
+  const handleReceiveIct = async (id) => {
+    const notes = window.prompt('Notes for ICT receive (optional):', '');
+    try {
+      const res = await fetch(`/api/transfers/${id}/receive-ict`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ records_notes: notes || '' })
+      });
+      if (res.ok) fetchTransfers();
+      else console.error('Failed to mark received by ICT');
+    } catch (err) { console.error(err); }
+  };
+
+  const handleCompleteReplacement = async (id) => {
+    // Prompt for existing replacement inventory id first
+    const repIdRaw = window.prompt('Enter replacement inventory ID to use (leave empty to create a new replacement):', '');
+    if (repIdRaw && repIdRaw.trim().length > 0) {
+      const repId = Number(repIdRaw.trim());
+      if (isNaN(repId)) return alert('Invalid replacement ID');
+      try {
+        const res = await fetch(`/api/transfers/${id}/complete-replacement`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ replacement_inventory_id: repId })
+        });
+        if (res.ok) fetchTransfers(); else { const e = await res.json(); alert(e.error || 'Failed to complete replacement'); }
+      } catch (err) { console.error(err); alert('Error connecting to server'); }
+      return;
+    }
+
+    // Create a new replacement
+    const asset_type = window.prompt('Replacement asset type (e.g. Laptop):', 'Laptop');
+    if (!asset_type) return;
+    const serial_no = window.prompt('Replacement serial number (optional):', '');
+    const manufacturer = window.prompt('Replacement manufacturer (optional):', '');
+    const model = window.prompt('Replacement model (optional):', '');
+    const status = window.prompt('Replacement status (Active/Stored):', 'Active');
+    const details = { asset_type, serial_no, manufacturer, model, status };
+    try {
+      const res = await fetch(`/api/transfers/${id}/complete-replacement`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ replacement_details: details })
+      });
+      if (res.ok) fetchTransfers(); else { const e = await res.json(); alert(e.error || 'Failed to create replacement'); }
+    } catch (err) { console.error(err); alert('Error connecting to server'); }
   };
 
   const handleAcknowledge = async (id) => {
@@ -131,89 +211,124 @@ const Transfers = () => {
 
       <div className="card shadow mb-4">
         <div className="card-body">
-          <h4 className="mb-3">Send Inventory to Department</h4>
-          <form onSubmit={handleSend}>
-            <div className="row g-3">
-              <div className="col-md-6">
-                <label className="form-label">Inventory Item</label>
-                <select className="form-select" name="inventory_id" value={form.inventory_id} onChange={handleChange} required>
-                  <option value="">-- Select Item --</option>
-                  {inventory.map(item => (
-                    <option key={item.id} value={item.id}>{item.asset_no} - {item.asset_type} ({item.department})</option>
-                  ))}
-                </select>
-              </div>
-              <div className="col-md-6">
-                <label className="form-label">Destination Department</label>
-                <select className="form-select" name="to_department" value={form.to_department} onChange={handleChange} required>
-                  <option value="">-- Select Department --</option>
-                  {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
-                </select>
-              </div>
-              <div className="col-md-6">
-                <label className="form-label">Destination (e.g. Mombasa, Kapenguria)</label>
-                <input type="text" className="form-control" name="destination" value={form.destination} onChange={handleChange} placeholder="Destination location" required />
-              </div>
-              <div className="col-md-6">
-                <label className="form-label">Notes (optional)</label>
-                <input type="text" className="form-control" name="notes" value={form.notes} onChange={handleChange} placeholder="Any notes for the transfer" />
-              </div>
-            </div>
-            <button type="submit" className="btn btn-success mt-3" disabled={loading}>{loading ? 'Sending...' : 'Send'}</button>
-          </form>
-          {message && <div className="alert alert-info mt-3">{message}</div>}
-        </div>
-      </div>
+          <h4 className="mb-3">Create Transfer</h4>
+          <div className="mb-3">
+            <label className="form-label">Transfer Type</label>
+            <select className="form-select" name="transfer_type" value={form.transfer_type} onChange={e => { setForm(f => ({ ...f, transfer_type: e.target.value })); setMessage(''); }}>
+              <option value="">-- Choose transfer type --</option>
+              <option value="branch">Branch (incoming to ICT)</option>
+              <option value="internal">Internal (replacement)</option>
+            </select>
+          </div>
 
-      <div className="card shadow">
-        <div className="card-body">
-          <h4 className="mb-3">Transfer History</h4>
-          <table className="table table-bordered table-sm">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Asset</th>
-                  <th>Destination</th>
-                <th>From</th>
-                <th>To</th>
-                <th>Sent By</th>
-                <th>Sent At</th>
-                <th>Status</th>
-                <th>Received By</th>
-                <th>Received At</th>
-                  <th>Tracking</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transfers.map(t => (
-                <tr key={t.id}>
-                  <td>{t.id}</td>
-                  <td>{t.asset_no ? `${t.asset_no} (${t.asset_type})` : t.inventory_id}</td>
-                  <td>{t.destination || ''}</td>
-                  <td>{t.from_department}</td>
-                  <td>{t.to_department}</td>
-                  <td>{t.sent_by}</td>
-                  <td>{new Date(t.sent_at).toLocaleString()}</td>
-                  <td>{t.status}</td>
-                  <td>{t.received_by}</td>
-                  <td>{t.received_at ? new Date(t.received_at).toLocaleString() : ''}</td>
-                  <td>{t.tracking_info}</td>
-                  <td>
-                    {t.status !== 'ReceivedByRecords' && t.to_department === 'Records' && (
-                      <button className="btn btn-sm btn-success me-1" onClick={() => handleRecordsReceive(t.id)}>Receive at Records</button>
-                    )}
-                    {t.status === 'ReceivedByRecords' && (
-                      <button className="btn btn-sm btn-warning me-1" onClick={() => handleShip(t.id)}>Mark as Shipped</button>
-                    )}
-                    {t.status !== 'Delivered' && (
-                      <button className="btn btn-sm btn-primary" onClick={() => handleAcknowledge(t.id)}>Acknowledge Destination</button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {/* Branch transfer form */}
+          {form.transfer_type === 'branch' && (
+            <form onSubmit={handleSend}>
+              <div className="row g-3">
+                <div className="col-md-6">
+                  <label className="form-label">Inventory Item (search)</label>
+                  <SearchBar placeholder="Search item being received..." onSelect={handleSelectInventory} />
+                  {form.inventory_id && <div className="small text-muted mt-1">Selected ID: {form.inventory_id}</div>}
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label">Repaired Status</label>
+                  <select className="form-select" name="repaired_status" value={form.repaired_status} onChange={handleChange}>
+                    <option value="repaired">Repaired</option>
+                    <option value="not_repaired">Not Repaired</option>
+                  </select>
+                </div>
+
+                <div className="col-md-6">
+                  <label className="form-label">Who Repaired</label>
+                  <input className="form-control" name="repaired_by" value={form.repaired_by} onChange={handleChange} placeholder="Technician name" />
+                </div>
+
+                <div className="col-md-6">
+                  <label className="form-label">Date Received</label>
+                  <input type="datetime-local" className="form-control" name="date_received" value={form.date_received} onChange={handleChange} />
+                </div>
+
+                <div className="col-md-6">
+                  <label className="form-label">Date Sent</label>
+                  <input type="datetime-local" className="form-control" name="date_sent" value={form.date_sent} onChange={handleChange} />
+                </div>
+
+                <div className="col-12">
+                  <label className="form-label">Repair Comments</label>
+                  <textarea className="form-control" rows="3" name="repair_comments" value={form.repair_comments} onChange={handleChange} placeholder="Notes about repair or inspection"></textarea>
+                </div>
+
+                <div className="col-md-6">
+                  <label className="form-label">Where Sent To (after ICT)</label>
+                  <input type="text" className="form-control" name="destination" value={form.destination} onChange={handleChange} placeholder="e.g., Branch name or department" />
+                </div>
+
+                <div className="col-md-6">
+                  <label className="form-label">From Department</label>
+                  <input className="form-control" name="from_department" value={form.from_department} onChange={handleChange} placeholder="Origin department" />
+                </div>
+
+              </div>
+              <button type="submit" className="btn btn-success mt-3" disabled={loading}>{loading ? 'Sending...' : 'Record Branch Transfer'}</button>
+            </form>
+          )}
+
+          {/* Internal replacement form */}
+          {form.transfer_type === 'internal' && (
+            <form onSubmit={handleSend}>
+              <div className="row g-3">
+                <div className="col-md-6">
+                  <label className="form-label">Item being replaced (search)</label>
+                  <SearchBar placeholder="Search faulty item..." onSelect={handleSelectInventory} />
+                  {form.inventory_id && <div className="small text-muted mt-1">Selected faulty ID: {form.inventory_id}</div>}
+                </div>
+
+                <div className="col-md-6">
+                  <label className="form-label">Date Received</label>
+                  <input type="datetime-local" className="form-control" name="date_received" value={form.date_received} onChange={handleChange} />
+                </div>
+
+                <div className="col-md-6">
+                  <label className="form-label">Received By</label>
+                  <input className="form-control" name="received_by" value={form.received_by || ''} onChange={handleChange} placeholder="Technician or ICT staff" />
+                </div>
+
+                <div className="col-12">
+                  <label className="form-label">Issue Comments</label>
+                  <textarea className="form-control" rows="3" name="issue_comments" value={form.issue_comments || ''} onChange={handleChange} placeholder="Describe reported issues"></textarea>
+                </div>
+
+                <div className="col-md-6">
+                  <label className="form-label">Department to return replacement to</label>
+                  <input className="form-control" name="to_department" value={form.to_department || ''} onChange={handleChange} placeholder="e.g., BANK, HR" />
+                </div>
+
+                <div className="col-md-6">
+                  <label className="form-label">Replacement item (optional - choose existing)</label>
+                  <SearchBar placeholder="Search replacement item (optional)" onSelect={item => { if (item && item.id) setReplacementInventoryId(item.id); }} />
+                  {replacementInventoryId && <div className="small text-muted mt-1">Selected replacement ID: {replacementInventoryId}</div>}
+                </div>
+
+                <div className="col-12">
+                  <button type="button" className="btn btn-outline-secondary me-2 mt-2" onClick={() => {
+                    // Prompt to create replacement details
+                    const asset_type = window.prompt('Replacement asset type (e.g. Laptop):', 'Laptop');
+                    if (!asset_type) return;
+                    const serial_no = window.prompt('Replacement serial number (optional):', '');
+                    const manufacturer = window.prompt('Replacement manufacturer (optional):', '');
+                    const model = window.prompt('Replacement model (optional):', '');
+                    const status = window.prompt('Replacement status (Active/Stored):', 'Active');
+                    setReplacementDetails({ asset_type, serial_no, manufacturer, model, status });
+                  }}>Create New Replacement</button>
+                  {replacementDetails && <div className="small text-muted mt-2">Will create replacement: {replacementDetails.asset_type} {replacementDetails.model || ''}</div>}
+                </div>
+
+              </div>
+              <button type="submit" className="btn btn-primary mt-3" disabled={loading}>{loading ? 'Processing...' : 'Create Internal Replacement'}</button>
+            </form>
+          )}
+
+          {message && <div className="alert alert-info mt-3">{message}</div>}
         </div>
       </div>
     </div>
