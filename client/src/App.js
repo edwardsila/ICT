@@ -13,6 +13,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
+import SearchBar from './components/SearchBar';
 
 // Wrapper for Reports page to show message for non-admins
 function ReportsMessageWrapper() {
@@ -70,6 +71,10 @@ function ModernHome() {
           <img src={mwalimuLogo} alt="Mwalimu Sacco Logo" style={{height: '120px', maxWidth: '320px', marginBottom: '24px', borderRadius: '24px', boxShadow: '0 4px 24px rgba(31,38,135,0.25)', background: '#fff', padding: '12px'}} />
           <h1 className="fw-bold mb-2" style={{color: '#1b5e20'}}>MNSS ICT Portal</h1>
           <p className="lead" style={{color: '#333'}}>Welcome to the MWALIMU NATIONAL SACCO ICT SYSTEM. Manage inventory, maintenance, and reports with ease.</p>
+          {/* Modern search placed here on the Home screen */}
+          <div className="mt-4 d-flex justify-content-center">
+            <SearchBar placeholder="Search inventory, users, or reports..." />
+          </div>
         </div>
       </div>
       <div className="row g-4 justify-content-center">

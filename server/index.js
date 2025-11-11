@@ -162,6 +162,12 @@ db.serialize(() => {
     if (!colNames.includes('returned_at')) toAdd.push("ALTER TABLE maintenance ADD COLUMN returned_at TEXT");
     if (!colNames.includes('repair_notes')) toAdd.push("ALTER TABLE maintenance ADD COLUMN repair_notes TEXT");
     if (!colNames.includes('repair_status')) toAdd.push("ALTER TABLE maintenance ADD COLUMN repair_status TEXT");
+    // New columns to support department-level maintenance tracking
+    if (!colNames.includes('start_date')) toAdd.push("ALTER TABLE maintenance ADD COLUMN start_date TEXT");
+    if (!colNames.includes('end_date')) toAdd.push("ALTER TABLE maintenance ADD COLUMN end_date TEXT");
+    if (!colNames.includes('progress')) toAdd.push("ALTER TABLE maintenance ADD COLUMN progress INTEGER DEFAULT 0");
+  if (!colNames.includes('machines_not_maintained')) toAdd.push("ALTER TABLE maintenance ADD COLUMN machines_not_maintained INTEGER DEFAULT 0");
+    if (!colNames.includes('dept_status')) toAdd.push("ALTER TABLE maintenance ADD COLUMN dept_status TEXT");
     toAdd.forEach(sql => {
       db.run(sql, (aErr) => { if (aErr) console.error('Failed to alter maintenance table:', aErr.message); });
     });
@@ -394,10 +400,18 @@ app.post('/api/maintenance/:id/mark-returned', requireLogin, (req, res) => {
 
 // Create maintenance records for a whole department (optionally per-device)
 app.post('/api/maintenance/department', requireLogin, (req, res) => {
-  const { department, date, equipment, equipment_model, user, repair_notes, inventory_ids, create_for_all } = req.body;
+  // Accept start_date (preferred) or date (backwards compatibility)
+  const { department, date, start_date, equipment, equipment_model, user, repair_notes, inventory_ids, create_for_all } = req.body;
+  // Prefer explicit start_date, fall back to date, otherwise default to now (so UI can omit it)
+  let recordStart = null;
+  if (start_date && typeof start_date === 'string' && start_date.trim().length > 0) recordStart = start_date;
+  else if (date && typeof date === 'string' && date.trim().length > 0) recordStart = date;
+  else recordStart = new Date().toISOString();
   if (!department || typeof department !== 'string' || department.length < 1 || department.length > 100) return res.status(400).json({ error: 'Invalid department' });
-  if (!date || typeof date !== 'string' || date.length < 4 || date.length > 50) return res.status(400).json({ error: 'Invalid date' });
-  if (!user || typeof user !== 'string' || user.length < 1 || user.length > 100) return res.status(400).json({ error: 'Invalid user' });
+  // recordStart is always set (defaults to now) but validate type/length
+  if (!recordStart || typeof recordStart !== 'string' || recordStart.length < 4 || recordStart.length > 200) return res.status(400).json({ error: 'Invalid start_date' });
+  // user is optional for department-level maintenance; use provided user or session username when available
+  const effectiveUser = (typeof user === 'string' && user.length > 0) ? user : (req.session?.user?.username || null);
 
   const dept = department;
 
@@ -406,10 +420,11 @@ app.post('/api/maintenance/department', requireLogin, (req, res) => {
     if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'No inventory items found for department' });
     const createdIds = [];
     db.serialize(() => {
-      const stmt = db.prepare('INSERT INTO maintenance (date, equipment, tagnumber, department, equipment_model, user, inventory_id, repair_notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+      // include start_date, end_date, progress, dept_status and machines_not_maintained for department-level records
+      const stmt = db.prepare('INSERT INTO maintenance (date, start_date, end_date, equipment, tagnumber, department, equipment_model, user, inventory_id, repair_notes, progress, dept_status, machines_not_maintained) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
       items.forEach(it => {
         const tagnumber = String(it.asset_no || `DEPT-${dept}-${Date.now()}`).slice(0,50);
-        stmt.run(date, equipment || it.asset_type || 'Device', tagnumber, dept, equipment_model || it.model || '', user, it.id, repair_notes || '');
+        stmt.run(recordStart, req.body.start_date || null, req.body.end_date || null, equipment || it.asset_type || 'Device', tagnumber, dept, equipment_model || it.model || '', effectiveUser, it.id, repair_notes || '', req.body.progress || 0, req.body.status || 'pending', Number.isFinite(Number(req.body.machines_not_maintained)) ? Number(req.body.machines_not_maintained) : 0);
         // Can't get lastID easily here synchronously — collect using lastID in final callback is complex; we will return a count instead
       });
       stmt.finalize(err => {
@@ -441,7 +456,8 @@ app.post('/api/maintenance/department', requireLogin, (req, res) => {
 
   // Otherwise create a single department-level maintenance record (inventory_id NULL)
   const tagnumber = `DEPT-MAINT-${dept}-${Date.now()}`.slice(0,50);
-  db.run('INSERT INTO maintenance (date, equipment, tagnumber, department, equipment_model, user, inventory_id, repair_notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [date, equipment || 'Department Sweep', tagnumber, dept, equipment_model || '', user, null, repair_notes || ''], function(err) {
+  // Insert a single department-level maintenance record (inventory_id NULL) including start/end/progress/status and machines_not_maintained
+  db.run('INSERT INTO maintenance (date, start_date, end_date, equipment, tagnumber, department, equipment_model, user, inventory_id, repair_notes, progress, dept_status, machines_not_maintained) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [recordStart, req.body.start_date || null, req.body.end_date || null, equipment || 'Department Sweep', tagnumber, dept, equipment_model || '', effectiveUser, null, repair_notes || '', req.body.progress || 0, req.body.status || 'pending', Number.isFinite(Number(req.body.machines_not_maintained)) ? Number(req.body.machines_not_maintained) : 0], function(err) {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ id: this.lastID });
   });
@@ -482,6 +498,24 @@ app.get('/api/departments', requireLogin, (req, res) => {
   db.all('SELECT id, name FROM departments ORDER BY name', [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
+  });
+});
+
+// Generic search endpoint (inventory-focused). Returns suggestions: [{ id, title, subtitle, type }]
+app.get('/api/search', requireLogin, (req, res) => {
+  const q = (req.query.q || '').toString().trim();
+  let limit = parseInt(req.query.limit, 10) || 8;
+  if (!q || q.length < 2) return res.json([]);
+  if (isNaN(limit) || limit <= 0) limit = 8;
+  if (limit > 100) limit = 100;
+
+  const like = '%' + q.toUpperCase().replace(/%/g, '') + '%';
+  const sql = `SELECT id, asset_no, asset_type, serial_no, manufacturer, model FROM inventory WHERE UPPER(asset_no) LIKE ? OR UPPER(asset_type) LIKE ? OR UPPER(serial_no) LIKE ? OR UPPER(manufacturer) LIKE ? OR UPPER(model) LIKE ? LIMIT ?`;
+  const params = [like, like, like, like, like, limit];
+  db.all(sql, params, (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    const out = (rows || []).map(r => ({ id: r.id, title: `${r.asset_no} — ${r.asset_type}`, subtitle: `${r.manufacturer || ''} ${r.model || ''} ${r.serial_no || ''}`.trim(), type: 'inventory' }));
+    res.json(out);
   });
 });
 

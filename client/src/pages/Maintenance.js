@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import SearchBar from '../components/SearchBar';
 
 const Maintenance = () => {
   const [activeTab, setActiveTab] = useState('device'); // 'device' or 'department'
@@ -15,14 +16,12 @@ const Maintenance = () => {
     user: ''
   });
   const [deptForm, setDeptForm] = useState({
-    date: '',
+    // Department maintenance fields (simplified per request)
+    start_date: '',
+    end_date: '',
     department: '',
-    user: '',
-    equipment: 'Department Sweep',
-    equipment_model: '',
     repair_notes: '',
-    create_for_all: false,
-    inventory_ids: []
+    machines_not_maintained: 0
   });
   // device-level form will use `form.inventory_id` and `form.repair_notes`
   const [DEPARTMENTS, setDEPARTMENTS] = useState([]);
@@ -67,6 +66,7 @@ const Maintenance = () => {
           tagnumber: item.asset_no || prev.tagnumber,
           manufacturer: item.manufacturer || prev.manufacturer,
           os_info: item.os_info || prev.os_info,
+          department: item.department || prev.department,
           repair_notes: prev.repair_notes,
           // also store os/model info for helper message
         }));
@@ -87,7 +87,7 @@ const Maintenance = () => {
     // update both forms so selection works in either tab
     setForm(prev => ({ ...prev, department: dept, inventory_id: null }));
     setDeptForm(prev => ({ ...prev, department: dept }));
-    // fetch inventory for department
+    // fetch inventory for department to show machine count
     try {
       const res = await fetch(`/api/inventory?department=${encodeURIComponent(dept)}`, { credentials: 'include' });
       if (res.ok) {
@@ -133,14 +133,12 @@ const Maintenance = () => {
     setMessage('');
     try {
       const payload = {
-        date: deptForm.date,
+        // client sends the requested minimal fields for department maintenance
+        start_date: deptForm.start_date || null,
+        end_date: deptForm.end_date || null,
         department: deptForm.department,
-        user: deptForm.user,
-        equipment: deptForm.equipment,
-        equipment_model: deptForm.equipment_model,
-        repair_notes: deptForm.repair_notes,
-        create_for_all: !!deptForm.create_for_all,
-        inventory_ids: deptForm.create_for_all ? [] : (deptForm.inventory_ids || [])
+        repair_notes: deptForm.repair_notes || '',
+        machines_not_maintained: Number.isFinite(Number(deptForm.machines_not_maintained)) ? Number(deptForm.machines_not_maintained) : 0
       };
       const res = await fetch('/api/maintenance/department', {
         method: 'POST',
@@ -151,7 +149,8 @@ const Maintenance = () => {
       if (res.ok) {
         const data = await res.json();
         setMessage(`Department maintenance recorded (${data.created || data.id || 'ok'})`);
-        setDeptForm({ date: '', department: '', user: '', equipment: 'Department Sweep', equipment_model: '', repair_notes: '', create_for_all: false, inventory_ids: [] });
+        setDeptForm({ start_date: '', end_date: '', department: '', repair_notes: '', machines_not_maintained: 0 });
+        setInventoryList([]);
       } else {
         const err = await res.json();
         setMessage(err.error || 'Failed to record department maintenance');
@@ -176,101 +175,116 @@ const Maintenance = () => {
 
           <form onSubmit={activeTab === 'device' ? handleSubmit : handleDeptSubmit}>
             <div className="row g-3">
-              <div className="col-md-6">
-                <label className="form-label">Date</label>
-                <input type="date" className="form-control" name="date" value={form.date} onChange={handleChange} required />
-              </div>
-              <div className="col-md-6">
-                <label className="form-label">Equipment</label>
-                {activeTab === 'device' ? (
-                  <input type="text" className="form-control" name="equipment" value={form.equipment} readOnly />
-                ) : (
-                  <input type="text" className="form-control" name="equipment" value={form.equipment} onChange={handleChange} placeholder="e.g. Laptop, Printer" required />
-                )}
-              </div>
-              <div className="col-md-6">
-                <label className="form-label">Tag Number</label>
-                <div className="input-group">
-                  <input type="text" className="form-control" name="tagnumber" value={form.tagnumber} onChange={handleChange} onBlur={e=>{ if (activeTab==='device') lookupTag(e.target.value); }} placeholder="e.g. SVC12345" required />
-                  <button type="button" className="btn btn-outline-secondary" title="Search tag in inventory" onClick={() => { if (activeTab==='device') lookupTag(form.tagnumber); }}>
-                    <i className="bi bi-search"></i>
-                  </button>
-                </div>
-                {form.inventory_id && (
-                  <div className="mt-2">
-                    <span className="badge bg-success">Inventory ID: {form.inventory_id}</span>
+              {activeTab === 'device' ? (
+                <>
+                  <div className="col-md-6">
+                    <label className="form-label">Date</label>
+                    <input type="date" className="form-control" name="date" value={form.date} onChange={handleChange} required />
                   </div>
-                )}
-                <div className="form-text">Enter tag or serial and click the search icon to load device info from inventory.</div>
-              </div>
-              <div className="col-md-6">
-                <label className="form-label">Department</label>
-                {activeTab === 'device' ? (
-                  <input type="text" className="form-control" name="department" value={form.department || ''} readOnly />
-                ) : (
-                  <>
-                    <div className="d-flex gap-2 flex-wrap">
+                  <div className="col-md-6">
+                    <label className="form-label">Equipment</label>
+                    <input type="text" className="form-control" name="equipment" value={form.equipment} readOnly />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label">Tag Number</label>
+                    <div className="d-flex gap-2">
+                      <div style={{flex: 1}}>
+                        <SearchBar
+                          placeholder="Search by asset no, serial, model or manufacturer..."
+                          value={form.tagnumber || ''}
+                          onQueryChange={v => setForm(prev => ({ ...prev, tagnumber: v }))}
+                          onSelect={async (s) => {
+                            if (!s || !s.id) return;
+                            try {
+                              const res = await fetch(`/api/inventory/${encodeURIComponent(s.id)}`, { credentials: 'include' });
+                              if (res.ok) {
+                                const item = await res.json();
+                                setForm(prev => ({
+                                  ...prev,
+                                  inventory_id: item.id,
+                                  equipment: item.asset_type || prev.equipment,
+                                  equipment_model: item.model || prev.equipment_model,
+                                  tagnumber: item.asset_no || prev.tagnumber,
+                                  manufacturer: item.manufacturer || prev.manufacturer,
+                                  os_info: item.os_info || prev.os_info,
+                                  department: item.department || prev.department,
+                                  repair_notes: prev.repair_notes
+                                }));
+                              }
+                            } catch (err) {
+                              // ignore
+                            }
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <button type="button" className="btn btn-outline-secondary" title="Lookup tag in inventory" onClick={() => { lookupTag(form.tagnumber); }}>
+                          <i className="bi bi-search"></i>
+                        </button>
+                      </div>
+                    </div>
+                    {form.inventory_id && (
+                      <div className="mt-2">
+                        <span className="badge bg-success">Inventory ID: {form.inventory_id}</span>
+                      </div>
+                    )}
+                    <div className="form-text">Search inventory and pick an item to populate device details for maintenance. You can also type a tag and blur to lookup.</div>
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label">Department</label>
+                    <input type="text" className="form-control" name="department" value={form.department || ''} readOnly />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label">Model</label>
+                    <input type="text" className="form-control" name="equipment_model" value={form.equipment_model} readOnly />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label">Manufacturer</label>
+                    <input type="text" className="form-control" name="manufacturer" value={form.manufacturer || ''} readOnly />
+                    <div className="form-text">Manufacturer (read-only from inventory)</div>
+                  </div>
+                  <div className="col-md-12">
+                    <label className="form-label">Repair Notes (optional)</label>
+                    <textarea className="form-control" name="repair_notes" value={form.repair_notes} onChange={handleChange} rows={3} />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label">User of the Equipment</label>
+                    <input type="text" className="form-control" name="user" value={form.user} onChange={handleChange} placeholder="e.g. John Doe" required />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="col-md-6">
+                    <label className="form-label">Date maintenance started</label>
+                    <input type="date" className="form-control" name="start_date" value={deptForm.start_date} onChange={handleDeptFormChange} required />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label">Date maintenance ended (optional)</label>
+                    <input type="date" className="form-control" name="end_date" value={deptForm.end_date} onChange={handleDeptFormChange} />
+                  </div>
+                  <div className="col-12">
+                    <label className="form-label">Department</label>
+                    <div className="d-flex gap-2 flex-wrap mb-2">
                       {DEPARTMENTS.map(d => (
                         <button key={d} type="button" className={`btn btn-${(deptForm.department) === d ? 'primary' : 'outline-primary'}`} onClick={() => handleDeptSelect(d)}>{d}</button>
                       ))}
                     </div>
-                    <div className="form-text">Select department to load inventory items below.</div>
-                  </>
-                )}
-              </div>
-              <div className="col-md-6">
-                <label className="form-label">Model</label>
-                {activeTab === 'device' ? (
-                  <input type="text" className="form-control" name="equipment_model" value={form.equipment_model} readOnly />
-                ) : (
-                  <input type="text" className="form-control" name="equipment_model" value={form.equipment_model} onChange={handleChange} placeholder="e.g. Dell Latitude 5400" required />
-                )}
-              </div>
-              <div className="col-md-6">
-                {activeTab === 'device' ? (
-                  <>
-                    <label className="form-label">Manufacturer</label>
-                    <input type="text" className="form-control" name="manufacturer" value={form.manufacturer || ''} readOnly />
-                    <div className="form-text">Manufacturer (read-only from inventory)</div>
-                  </>
-                ) : (
-                  <>
-                    <label className="form-label">Department Inventory (select multiple if needed)</label>
-                    <select multiple className="form-select" value={deptForm.inventory_ids} onChange={e => {
-                      const opts = Array.from(e.target.options).filter(o => o.selected).map(o => o.value);
-                      setDeptForm(prev => ({ ...prev, inventory_ids: opts }));
-                    }}>
-                      {inventoryList.map(it => (
-                        <option key={it.id} value={String(it.id)}>{it.asset_no} — {it.model || it.asset_type}</option>
-                      ))}
-                    </select>
-                    <div className="form-text">Choose specific inventory items to include, or check "Include all" below.</div>
-                  </>
-                )}
-              </div>
-              <div className="col-md-12">
-                <label className="form-label">Repair Notes (optional)</label>
-                {activeTab === 'device' ? (
-                  <textarea className="form-control" name="repair_notes" value={form.repair_notes} onChange={handleChange} rows={3} />
-                ) : (
-                  <textarea className="form-control" name="repair_notes" value={deptForm.repair_notes} onChange={handleDeptFormChange} rows={3} />
-                )}
-              </div>
-              <div className="col-md-6">
-                <label className="form-label">User of the Equipment</label>
-                {activeTab === 'device' ? (
-                  <input type="text" className="form-control" name="user" value={form.user} onChange={handleChange} placeholder="e.g. John Doe" required />
-                ) : (
-                  <input type="text" className="form-control" name="user" value={deptForm.user} onChange={handleDeptFormChange} placeholder="Technician name" required />
-                )}
-              </div>
-              {activeTab === 'department' && (
-                <div className="col-md-12">
-                  <div className="form-check">
-                    <input className="form-check-input" type="checkbox" id="create_for_all" name="create_for_all" checked={deptForm.create_for_all} onChange={handleDeptFormChange} />
-                    <label className="form-check-label" htmlFor="create_for_all">Include all inventory items in selected department</label>
+                    {deptForm.department && (
+                      <div className="mb-2">
+                        <strong>{inventoryList.length}</strong> machine(s) found in <span className="fw-semibold">{deptForm.department}</span>.
+                      </div>
+                    )}
+                    <div className="form-text">Select department and record the overall department maintenance details.</div>
                   </div>
-                </div>
+                  <div className="col-md-6">
+                    <label className="form-label">Number of machines not maintained</label>
+                    <input type="number" min={0} className="form-control" name="machines_not_maintained" value={deptForm.machines_not_maintained} onChange={handleDeptFormChange} />
+                  </div>
+                  <div className="col-md-12">
+                    <label className="form-label">Comments on overall maintenance</label>
+                    <textarea className="form-control" name="repair_notes" value={deptForm.repair_notes} onChange={handleDeptFormChange} rows={3} />
+                  </div>
+                </>
               )}
             </div>
             <button type="submit" className="btn btn-success mt-3 w-100">Add Record</button>
