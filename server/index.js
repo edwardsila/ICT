@@ -611,6 +611,29 @@ app.get('/api/departments', requireLogin, (req, res) => {
   });
 });
 
+// Users endpoints (admin access)
+app.get('/api/users', requireLogin, (req, res) => {
+  const user = req.session?.user;
+  if (!user || user.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+  db.all('SELECT id, username, role FROM users ORDER BY username', [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows || []);
+  });
+});
+
+app.put('/api/users/:id', requireLogin, (req, res) => {
+  const actor = req.session?.user;
+  if (!actor || actor.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+  const { id } = req.params;
+  const { role } = req.body;
+  if (!id || isNaN(Number(id))) return res.status(400).json({ error: 'Invalid user id' });
+  if (!role || (role !== 'admin' && role !== 'user')) return res.status(400).json({ error: 'Invalid role' });
+  db.run('UPDATE users SET role = ? WHERE id = ?', [role, id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ updated: this.changes });
+  });
+});
+
 // Admin-only: create department
 app.post('/api/departments', requireLogin, (req, res) => {
   const user = req.session?.user;
