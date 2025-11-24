@@ -144,8 +144,10 @@ The system streamlines asset tracking, department handovers, and accountability 
 - `status`: Current status (Active, In Repair, Replaced)
 - `department`: Assigned department
 - `received_at`: When added to inventory
-- `replacement_of`: ID of item this replaces
-- `replaced_by`: ID of item that replaced this one
+- `replacement_of`: ID of item this replaces (bidirectional relationship maintained by backend)
+- `replaced_by`: ID of item that replaced this one (automatically updated when replacement is created)
+
+**Note**: The `replacement_of` and `replaced_by` fields form a bidirectional relationship. The backend automatically maintains synchronization - when a new item is created with `replacement_of`, the system updates the old item's `replaced_by` field and vice versa.
 
 ### 3. Maintenance Module (`/api/maintenance/*`)
 
@@ -401,9 +403,15 @@ CREATE TABLE asset_counters (
 
 ### Authentication
 - Session-based authentication
-- Session secret: 'ict_secret_key' (should be environment variable in production)
+- Session secret: 'ict_secret_key' (⚠️ **Production Warning**: This should be replaced with environment variable `ICT_SESSION_SECRET` for production deployments)
 - Session timeout: 1 hour (3600000 ms)
 - Secure cookie configuration
+
+**Production Security Recommendation**:
+```javascript
+// Use environment variable for session secret
+secret: process.env.ICT_SESSION_SECRET || 'ict_secret_key'
+```
 
 ### Input Validation
 - Username: 3-20 alphanumeric characters
@@ -425,8 +433,8 @@ CREATE TABLE asset_counters (
 ## Deployment Guide
 
 ### Prerequisites
-- Node.js (v14 or higher)
-- npm (v6 or higher)
+- Node.js (v18 LTS or higher recommended - v14 reached EOL in April 2023)
+- npm (v8 or higher)
 
 ### Installation Steps
 
@@ -646,7 +654,7 @@ npm run build
 For questions, issues, or demo access, contact the MWALIMU Towers ICT team.
 
 ### System Requirements
-- **Backend**: Node.js 14+, SQLite3
+- **Backend**: Node.js 18 LTS+ (v14 EOL), SQLite3
 - **Frontend**: Modern browser (Chrome, Firefox, Safari, Edge)
 - **Network**: HTTP/HTTPS access to API server
 
