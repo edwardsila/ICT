@@ -140,14 +140,6 @@ function App() {
             <h1 className="fw-bold mb-2 text-gradient animate-fade-up" style={{fontSize: '2.6rem', animationDelay: '0.08s'}}>Mwalimu National ICT</h1>
             <p className="lead mb-3 animate-fade-up" style={{maxWidth: '820px', margin: '0 auto', animationDelay: '0.12s'}}>A simple, fast system to manage your assets, maintenance and transfers. Secure, auditable and built for the MWALIMU community.</p>
             <div className="d-flex justify-content-center mt-4">
-              <div style={{width: 760, maxWidth: '100%'}} className="d-flex gap-2">
-                <div style={{flex: 1}} className="stagger" aria-hidden style={{'--delay': '0.14s'}}>
-                  <SearchBar placeholder="Search inventory, users, or actions..." value={query} onQueryChange={setQuery} onSelect={onSelect} />
-                </div>
-                <div className="stagger-pop" style={{'--delay': '0.18s'}}>
-                  <button className="btn btn-primary btn-lg" onClick={() => doNavigate(`/inventory?q=${encodeURIComponent(query)}`)}>Search</button>
-                </div>
-              </div>
             </div>
               <div className="mt-4 d-flex justify-content-center gap-2">
                 <Link to="/inventory" className="btn btn-light btn-lg stagger-pop" style={{'--delay': '0.22s'}}>Add Inventory</Link>

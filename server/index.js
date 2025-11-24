@@ -2,7 +2,8 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const SALT_ROUNDS = 10;
-const sqlite3 = require('sqlite3').verbose();
+const Database = require('better-sqlite3');
+
 const fs = require('fs');
 const cors = require('cors');
 const path = require('path');
@@ -27,15 +28,60 @@ app.use(session({
 }));
 app.use(express.static(path.join(__dirname, '../client/build')));
 
-// SQLite setup
+// SQLite setup (better-sqlite3)
 const dbPath = path.join(__dirname, 'ict_inventory.db');
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('Error opening database:', err.message);
-  } else {
-    console.log('Connected to SQLite database.');
+let db;
+try {
+  db = new Database(dbPath);
+  console.log('Connected to SQLite (better-sqlite3) database.');
+} catch (err) {
+  console.error('Error opening database:', err && err.message ? err.message : err);
+  // rethrow so process fails loud if DB can't be opened
+  throw err;
+}
+
+// Compatibility wrapper: provide async-style methods used by the rest of the code
+db.serialize = function(cb) { try { cb(); } catch (e) { /* ignore */ } };
+
+// internal helper to normalize params
+function _params(arrOrMaybe) {
+  if (Array.isArray(arrOrMaybe)) return arrOrMaybe;
+  if (arrOrMaybe === undefined || arrOrMaybe === null) return [];
+  return [arrOrMaybe];
+}
+
+// db.run(sql, params..., callback) where callback expects (err) and uses this.lastID/this.changes
+db.run = function(sql, params, cb) {
+  if (typeof params === 'function') { cb = params; params = []; }
+  try {
+    const info = db.prepare(sql).run(_params(params));
+    if (typeof cb === 'function') cb.call({ lastID: info.lastInsertRowid, changes: info.changes }, null);
+  } catch (e) {
+    if (typeof cb === 'function') cb.call(null, e);
   }
-});
+};
+
+// db.get(sql, params..., callback) -> callback(err, row)
+db.get = function(sql, params, cb) {
+  if (typeof params === 'function') { cb = params; params = []; }
+  try {
+    const row = db.prepare(sql).get(_params(params));
+    if (typeof cb === 'function') cb(null, row);
+  } catch (e) {
+    if (typeof cb === 'function') cb(e);
+  }
+};
+
+// db.all(sql, params..., callback) -> callback(err, rows)
+db.all = function(sql, params, cb) {
+  if (typeof params === 'function') { cb = params; params = []; }
+  try {
+    const rows = db.prepare(sql).all(_params(params));
+    if (typeof cb === 'function') cb(null, rows);
+  } catch (e) {
+    if (typeof cb === 'function') cb(e);
+  }
+};
 
 // Create tables if they don't exist and seed departments, then start server
 const createTables = (cb) => {
@@ -220,8 +266,11 @@ app.post('/api/register', (req, res) => {
     }
     db.run('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', [username, hash, role || 'user'], function(err) {
       if (err) {
-        console.error('Registration DB error:', err);
-        if (err.message && err.message.includes('UNIQUE')) return res.status(400).json({ error: 'Username already exists' });
+        // Handle UNIQUE constraint as a common, expected client error without noisy stack traces
+        if (err && err.message && err.message.includes('UNIQUE')) {
+          return res.status(400).json({ error: 'Username already exists' });
+        }
+        console.error('Registration DB error:', err && err.message ? err.message : err);
         return res.status(500).json({ error: 'Registration failed' });
       }
       db.get('SELECT id, username, role FROM users WHERE id = ?', [this.lastID], (err2, row) => {
@@ -559,24 +608,6 @@ app.get('/api/departments', requireLogin, (req, res) => {
   db.all('SELECT id, name FROM departments ORDER BY name', [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
-  });
-});
-
-// Generic search endpoint (inventory-focused). Returns suggestions: [{ id, title, subtitle, type }]
-app.get('/api/search', requireLogin, (req, res) => {
-  const q = (req.query.q || '').toString().trim();
-  let limit = parseInt(req.query.limit, 10) || 8;
-  if (!q || q.length < 2) return res.json([]);
-  if (isNaN(limit) || limit <= 0) limit = 8;
-  if (limit > 100) limit = 100;
-
-  const like = '%' + q.toUpperCase().replace(/%/g, '') + '%';
-  const sql = `SELECT id, asset_no, asset_type, serial_no, manufacturer, model FROM inventory WHERE UPPER(asset_no) LIKE ? OR UPPER(asset_type) LIKE ? OR UPPER(serial_no) LIKE ? OR UPPER(manufacturer) LIKE ? OR UPPER(model) LIKE ? LIMIT ?`;
-  const params = [like, like, like, like, like, limit];
-  db.all(sql, params, (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-    const out = (rows || []).map(r => ({ id: r.id, title: `${r.asset_no} — ${r.asset_type}`, subtitle: `${r.manufacturer || ''} ${r.model || ''} ${r.serial_no || ''}`.trim(), type: 'inventory' }));
-    res.json(out);
   });
 });
 

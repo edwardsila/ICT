@@ -6,6 +6,7 @@ const Register = () => {
   const [form, setForm] = useState({ username: '', password: '' });
   const [message, setMessage] = useState('');
   const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleChange = e => {
@@ -14,9 +15,10 @@ const Register = () => {
 
   const handleSubmit = async e => {
     e.preventDefault();
+    if (loading) return;
     setMessage('');
     setSuccess(false);
-    console.log('Submitting registration form:', form);
+    setLoading(true);
     try {
       const res = await fetch('/api/register', {
         method: 'POST',
@@ -35,6 +37,8 @@ const Register = () => {
       }
     } catch {
       setMessage('Error connecting to server.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -63,7 +67,7 @@ const Register = () => {
               <input type="password" className="form-control" id="password" name="password" value={form.password} onChange={handleChange} placeholder="Enter password" required />
             </div>
           </div>
-          <button type="submit" className="btn btn-warning w-100 fw-bold">Register</button>
+          <button type="submit" className="btn btn-warning w-100 fw-bold" disabled={loading}>{loading ? 'Registering...' : 'Register'}</button>
           <div className="text-center mt-3">
             <Link to="/login" className="text-warning">Already have an account? Login</Link>
           </div>

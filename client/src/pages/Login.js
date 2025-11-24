@@ -36,7 +36,9 @@ const Login = () => {
       } else {
         if (res.status === 401 || res.status === 403) {
           localStorage.removeItem('user');
-          window.location.href = '/login';
+          // Show the server error inline instead of forcing a reload so
+          // the user sees the real reason (invalid credentials, etc.)
+          setMessage(data.error || 'Invalid credentials');
           return;
         }
         setMessage(data.error || 'Login failed.');
