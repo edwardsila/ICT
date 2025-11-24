@@ -4,6 +4,10 @@
 ## Overview
 This web application is designed for MWALIMU Towers ICT and Records teams to manage inventory, maintenance, transfers, and reporting for ICT assets and equipment. It streamlines asset tracking, department handovers, and accountability across the organization.
 
+📚 **Documentation**:
+- [**SYSTEM_DOCUMENTATION.md**](SYSTEM_DOCUMENTATION.md) - Complete technical documentation (19KB)
+- [**QUICK_REFERENCE.md**](QUICK_REFERENCE.md) - Quick reference guide (4KB)
+
 ## Features
 
 - **User Authentication**: Secure login and registration for staff and admins.
