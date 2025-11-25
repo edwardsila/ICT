@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-// Bootstrap-styled Admin page: lists users and allows promote/demote
+// Tailwind/TailAdmin-styled Admin page: lists users and allows promote/demote
 const Admin = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -59,41 +59,46 @@ const Admin = () => {
   };
 
   return (
-    <div className="container py-4">
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <h1 className="h3 mb-0">Admin Dashboard</h1>
-        <div className="text-muted small">Signed in as <strong>{currentUser?.username}</strong></div>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">Admin Dashboard</h1>
+          <p className="text-sm text-gray-500 mt-1">Manage users and roles</p>
+        </div>
+        <div className="text-sm text-gray-600">Signed in as <span className="font-medium">{currentUser?.username}</span></div>
       </div>
 
-      <div className="card">
-        <div className="card-body">
-          <h2 className="h5">Users</h2>
-          {error && <div className="alert alert-danger mt-3">{error}</div>}
+      <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="px-6 py-4 border-b">
+          <h2 className="text-lg font-medium text-gray-800">Users</h2>
+        </div>
+        <div className="p-6">
+          {error && <div className="mb-4 rounded-md bg-red-50 border border-red-100 text-red-700 px-4 py-3">{error}</div>}
 
           {loading ? (
-            <div className="mt-3">Loading...</div>
+            <div className="text-gray-500">Loading...</div>
           ) : (
-            <div className="table-responsive mt-3">
-              <table className="table table-hover table-sm align-middle">
-                <thead className="table-light">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
                   <tr>
-                    <th style={{width: '6%'}}>ID</th>
-                    <th>Username</th>
-                    <th style={{width: '16%'}}>Role</th>
-                    <th style={{width: '18%'}}>Actions</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: '6%'}}>ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: '16%'}}>Role</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" style={{width: '18%'}}>Actions</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="bg-white divide-y divide-gray-200">
                   {users.map(u => (
                     <tr key={u.id}>
-                      <td>{u.id}</td>
-                      <td>{u.username}</td>
-                      <td>{u.role}</td>
-                      <td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{u.id}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{u.username}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{u.role}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
                         {u.role !== 'admin' ? (
-                          <button className="btn btn-sm btn-success me-2" onClick={() => changeRole(u.id, 'admin')}>Promote</button>
+                          <button className="inline-flex items-center px-3 py-1.5 bg-green-500 text-white text-sm font-medium rounded hover:bg-green-600" onClick={() => changeRole(u.id, 'admin')}>Promote</button>
                         ) : (
-                          <button className="btn btn-sm btn-outline-secondary me-2" onClick={() => changeRole(u.id, 'user')}>Demote</button>
+                          <button className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm font-medium rounded hover:bg-gray-50" onClick={() => changeRole(u.id, 'user')}>Demote</button>
                         )}
                       </td>
                     </tr>
