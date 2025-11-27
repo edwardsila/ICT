@@ -163,30 +163,48 @@ const Maintenance = () => {
     }
   };
   return (
-    <div className="container py-5">
-      <div className="mb-3">
-        <Link to="/" className="btn btn-outline-secondary"><i className="bi bi-arrow-left"></i> Back to Home</Link>
+    <div className="max-w-4xl mx-auto p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <Link to="/" className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-800"><i className="bi bi-arrow-left"></i> Back</Link>
+          <h2 className="text-2xl font-semibold">Maintenance</h2>
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => { setActiveTab('department'); document.getElementById('maintenance-form')?.scrollIntoView({ behavior: 'smooth' }); }} className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded shadow">
+            <i className="bi bi-gear-wide-connected"></i>
+            New Department Sweep
+          </button>
+          <button type="button" onClick={() => { setActiveTab('device'); document.getElementById('maintenance-form')?.scrollIntoView({ behavior: 'smooth' }); }} className="inline-flex items-center gap-2 border border-gray-200 bg-white text-gray-700 px-3 py-2 rounded shadow-sm">
+            <i className="bi bi-box-seam"></i>
+            Add Device Maintenance
+          </button>
+        </div>
       </div>
-      <h2 className="mb-4">Maintenance</h2>
-      <div className="card shadow mb-4">
-        <div className="card-body">
-          <h4 className="mb-3">Add Maintenance Record</h4>
-          <ul className="nav nav-tabs mb-3">
-            <li className="nav-item"><button type="button" className={`nav-link ${activeTab==='device'?'active':''}`} onClick={()=>setActiveTab('device')}>Device</button></li>
-            <li className="nav-item"><button type="button" className={`nav-link ${activeTab==='department'?'active':''}`} onClick={()=>setActiveTab('department')}>Department</button></li>
-          </ul>
+
+      <div id="maintenance-form" className="bg-white shadow-md rounded-lg p-6 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-medium">Add Maintenance Record</h3>
+          <div className="text-sm text-gray-500">Record device or department maintenance quickly</div>
+        </div>
+
+          <div className="mb-4">
+            <div className="inline-flex rounded-md bg-gray-100 p-1">
+              <button type="button" className={`${activeTab==='device' ? 'bg-white shadow-sm text-indigo-700' : 'text-gray-600'} px-4 py-2 rounded`} onClick={()=>setActiveTab('device')}>Device</button>
+              <button type="button" className={`${activeTab==='department' ? 'bg-white shadow-sm text-indigo-700' : 'text-gray-600'} px-4 py-2 rounded`} onClick={()=>setActiveTab('department')}>Department</button>
+            </div>
+          </div>
 
           <form onSubmit={activeTab === 'device' ? handleSubmit : handleDeptSubmit}>
-            <div className="row g-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {activeTab === 'device' ? (
                 <>
-                  <div className="col-md-6">
-                    <label className="form-label">Date</label>
-                    <input type="date" className="form-control" name="date" value={form.date} onChange={handleChange} required />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Date</label>
+                    <input type="date" className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2" name="date" value={form.date} onChange={handleChange} required />
                   </div>
-                  <div className="col-md-6">
-                    <label className="form-label">Equipment</label>
-                    <input type="text" className="form-control" name="equipment" value={form.equipment} readOnly />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Equipment</label>
+                    <input type="text" className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2 bg-gray-50" name="equipment" value={form.equipment} readOnly />
                   </div>
                   <div className="col-md-6">
                     <label className="form-label">Tag Number(MNSSXXX)</label>
@@ -234,59 +252,59 @@ const Maintenance = () => {
                     )}
                     <div className="form-text">Search inventory and pick an item to populate device details for maintenance. You can also type a tag and blur to lookup.</div>
                   </div>
-                  <div className="col-md-6">
-                    <label className="form-label">Department</label>
-                    <input type="text" className="form-control" name="department" value={form.department || ''} readOnly />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Department</label>
+                    <input type="text" className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2 bg-gray-50" name="department" value={form.department || ''} readOnly />
                   </div>
-                  <div className="col-md-6">
-                    <label className="form-label">Model</label>
-                    <input type="text" className="form-control" name="equipment_model" value={form.equipment_model} readOnly />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Model</label>
+                    <input type="text" className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2 bg-gray-50" name="equipment_model" value={form.equipment_model} readOnly />
                   </div>
-                  <div className="col-md-6">
-                    <label className="form-label">Manufacturer</label>
-                    <input type="text" className="form-control" name="manufacturer" value={form.manufacturer || ''} readOnly />
-                    <div className="form-text">Manufacturer (read-only from inventory)</div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Manufacturer</label>
+                    <input type="text" className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2 bg-gray-50" name="manufacturer" value={form.manufacturer || ''} readOnly />
+                    <p className="text-xs text-gray-400 mt-1">Manufacturer (read-only from inventory)</p>
                   </div>
-                  <div className="col-md-12">
-                    <label className="form-label">Repair Notes (optional)</label>
-                    <textarea className="form-control" name="repair_notes" value={form.repair_notes} onChange={handleChange} rows={3} />
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700">Repair Notes (optional)</label>
+                    <textarea className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2" name="repair_notes" value={form.repair_notes} onChange={handleChange} rows={3} />
                   </div>
-                  <div className="col-md-6">
-                    <label className="form-label">User of the Equipment</label>
-                    <input type="text" className="form-control" name="user" value={form.user} onChange={handleChange} placeholder="e.g. John Doe" required />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">User of the Equipment</label>
+                    <input type="text" className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2" name="user" value={form.user} onChange={handleChange} placeholder="e.g. John Doe" required />
                   </div>
                 </>
               ) : (
                 <>
-                  <div className="col-md-6">
-                    <label className="form-label">Date maintenance started</label>
-                    <input type="date" className="form-control" name="start_date" value={deptForm.start_date} onChange={handleDeptFormChange} required />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Date maintenance started</label>
+                    <input type="date" className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2" name="start_date" value={deptForm.start_date} onChange={handleDeptFormChange} required />
                   </div>
-                  <div className="col-md-6">
-                    <label className="form-label">Date maintenance ended (optional)</label>
-                    <input type="date" className="form-control" name="end_date" value={deptForm.end_date} onChange={handleDeptFormChange} />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Date maintenance ended (optional)</label>
+                    <input type="date" className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2" name="end_date" value={deptForm.end_date} onChange={handleDeptFormChange} />
                   </div>
-                  <div className="col-12">
-                    <label className="form-label">Department</label>
-                    <div className="d-flex gap-2 flex-wrap mb-2">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700">Department</label>
+                    <div className="flex flex-wrap gap-2 mt-2 mb-2">
                       {DEPARTMENTS.map(d => (
-                        <button key={d} type="button" className={`btn btn-${(deptForm.department) === d ? 'primary' : 'outline-primary'}`} onClick={() => handleDeptSelect(d)}>{d}</button>
+                        <button key={d} type="button" className={`${(deptForm.department) === d ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border'} px-3 py-1 rounded-md shadow-sm`} onClick={() => handleDeptSelect(d)}>{d}</button>
                       ))}
                     </div>
                     {deptForm.department && (
-                      <div className="mb-2">
-                        <strong>{inventoryList.length}</strong> machine(s) found in <span className="fw-semibold">{deptForm.department}</span>.
+                      <div className="mb-2 text-sm text-gray-600">
+                        <strong className="text-gray-800">{inventoryList.length}</strong> machine(s) found in <span className="font-semibold">{deptForm.department}</span>.
                       </div>
                     )}
-                    <div className="form-text">Select department and record the overall department maintenance details.</div>
+                    <p className="mt-1 text-xs text-gray-400">Select department and record the overall department maintenance details.</p>
                   </div>
-                  <div className="col-md-6">
-                    <label className="form-label">Number of machines not maintained</label>
-                    <input type="number" min={0} className="form-control" name="machines_not_maintained" value={deptForm.machines_not_maintained} onChange={handleDeptFormChange} />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Number of machines not maintained</label>
+                    <input type="number" min={0} className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2" name="machines_not_maintained" value={deptForm.machines_not_maintained} onChange={handleDeptFormChange} />
                   </div>
-                  <div className="col-md-12">
-                    <label className="form-label">Comments on overall maintenance</label>
-                    <textarea className="form-control" name="repair_notes" value={deptForm.repair_notes} onChange={handleDeptFormChange} rows={3} />
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700">Comments on overall maintenance</label>
+                    <textarea className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2" name="repair_notes" value={deptForm.repair_notes} onChange={handleDeptFormChange} rows={3} />
                   </div>
                 </>
               )}
@@ -295,8 +313,7 @@ const Maintenance = () => {
           </form>
           {message && <div className="alert alert-info mt-3">{message} {lastNotFoundTag && (<Link to={`/inventory?serial=${encodeURIComponent(lastNotFoundTag)}`} className="btn btn-link">Add device</Link>)}</div>}
         </div>
-      </div>
-        <InventoryPreview id={previewId} open={previewOpen} onClose={() => { setPreviewOpen(false); setPreviewId(null); }} />
+      <InventoryPreview id={previewId} open={previewOpen} onClose={() => { setPreviewOpen(false); setPreviewId(null); }} />
     </div>
   );
 };

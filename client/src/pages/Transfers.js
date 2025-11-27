@@ -217,144 +217,181 @@ const Transfers = () => {
   };
 
   return (
-    <div className="container py-5">
-      <div className="mb-3">
-        <Link to="/" className="btn btn-outline-secondary"><i className="bi bi-arrow-left"></i> Back to Home</Link>
+    <div className="max-w-5xl mx-auto p-6">
+      <div className="flex items-center justify-between mb-6">
+        <Link to="/" className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"><i className="bi bi-arrow-left"></i> Back</Link>
+        <h2 className="text-2xl font-semibold">Transfers</h2>
+        <div />
       </div>
-      <h2 className="mb-4">Transfers</h2>
 
-      <div className="card shadow mb-4">
-        <div className="card-body">
-          <h4 className="mb-3">Create Transfer</h4>
-          <div className="mb-3">
-            <label className="form-label">Transfer Type</label>
-            <select className="form-select" name="transfer_type" value={form.transfer_type} onChange={e => { setForm(f => ({ ...f, transfer_type: e.target.value })); setMessage(''); }}>
-              <option value="">-- Choose transfer type --</option>
-              <option value="branch">Branch (incoming to ICT)</option>
-              <option value="internal">Internal (replacement)</option>
-            </select>
-          </div>
+      <div className="bg-white shadow rounded-lg p-6 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-lg font-medium">Create Transfer</h4>
+          <div className="text-sm text-gray-500">Create branch or internal transfers</div>
+        </div>
 
-          {/* Branch transfer form */}
-          {form.transfer_type === 'branch' && (
-            <form onSubmit={handleSend}>
-              <div className="row g-3">
-                <div className="col-md-6">
-                  <label className="form-label">Inventory Item (search)</label>
-                  <SearchBar placeholder="Search item being received..." onSelect={handleSelectInventory} />
-                  {form.inventory_id && <div className="small text-muted mt-1">Selected ID: {form.inventory_id}</div>}
-                </div>
-                <div className="col-md-6">
-                  <label className="form-label">Repaired Status</label>
-                  <select className="form-select" name="repaired_status" value={form.repaired_status} onChange={handleChange}>
-                    <option value="repaired">Repaired</option>
-                    <option value="not_repaired">Not Repaired</option>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Transfer Type</label>
+          <select name="transfer_type" value={form.transfer_type} onChange={e => { setForm(f => ({ ...f, transfer_type: e.target.value })); setMessage(''); }} className="mt-1 block w-full max-w-xs rounded-md border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+            <option value="">-- Choose transfer type --</option>
+            <option value="branch">Branch (incoming to ICT)</option>
+            <option value="internal">Internal (replacement)</option>
+          </select>
+        </div>
+
+        {/* Branch transfer form */}
+        {form.transfer_type === 'branch' && (
+          <form onSubmit={handleSend}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Inventory Item (search)</label>
+                <SearchBar placeholder="Search item being received..." onSelect={handleSelectInventory} />
+                {form.inventory_id && <div className="text-sm text-gray-500 mt-1">Selected ID: {form.inventory_id}</div>}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Repaired Status</label>
+                <select name="repaired_status" value={form.repaired_status} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2">
+                  <option value="repaired">Repaired</option>
+                  <option value="not_repaired">Not Repaired</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Who Repaired</label>
+                <input name="repaired_by" value={form.repaired_by} onChange={handleChange} placeholder="Technician name" className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Date Received</label>
+                <input type="datetime-local" name="date_received" value={form.date_received} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Date Sent</label>
+                <input type="datetime-local" name="date_sent" value={form.date_sent} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2" />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700">Repair Comments</label>
+                <textarea rows="3" name="repair_comments" value={form.repair_comments} onChange={handleChange} placeholder="Notes about repair or inspection" className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Where Sent To (after ICT)</label>
+                <div className="flex gap-2 mt-1">
+                  <select name="to_department" value={form.to_department || ''} onChange={handleChange} className="flex-1 rounded-md border-gray-300 px-3 py-2">
+                    <option value="">-- Select department (optional) --</option>
+                    {departments.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
+                  <input type="text" name="destination" value={form.destination} onChange={handleChange} placeholder="Freeform destination (optional)" className="flex-1 rounded-md border-gray-300 px-3 py-2" />
                 </div>
+              </div>
 
-                <div className="col-md-6">
-                  <label className="form-label">Who Repaired</label>
-                  <input className="form-control" name="repaired_by" value={form.repaired_by} onChange={handleChange} placeholder="Technician name" />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">From Department</label>
+                <select name="from_department" value={form.from_department || ''} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2">
+                  <option value="">-- Select origin department --</option>
+                  {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="mt-4">
+              <button type="submit" className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md" disabled={loading}>{loading ? 'Sending...' : 'Record Branch Transfer'}</button>
+            </div>
+          </form>
+        )}
 
-                <div className="col-md-6">
-                  <label className="form-label">Date Received</label>
-                  <input type="datetime-local" className="form-control" name="date_received" value={form.date_received} onChange={handleChange} />
-                </div>
+        {/* Internal replacement form */}
+        {form.transfer_type === 'internal' && (
+          <form onSubmit={handleSend}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Item being replaced (search)</label>
+                <SearchBar placeholder="Search faulty item..." onSelect={handleSelectInventory} />
+                {form.inventory_id && <div className="text-sm text-gray-500 mt-1">Selected faulty ID: {form.inventory_id}</div>}
+              </div>
 
-                <div className="col-md-6">
-                  <label className="form-label">Date Sent</label>
-                  <input type="datetime-local" className="form-control" name="date_sent" value={form.date_sent} onChange={handleChange} />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Date Received</label>
+                <input type="datetime-local" name="date_received" value={form.date_received} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2" />
+              </div>
 
-                <div className="col-12">
-                  <label className="form-label">Repair Comments</label>
-                  <textarea className="form-control" rows="3" name="repair_comments" value={form.repair_comments} onChange={handleChange} placeholder="Notes about repair or inspection"></textarea>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Received By</label>
+                <input name="received_by" value={form.received_by || ''} onChange={handleChange} placeholder="Technician or ICT staff" className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2" />
+              </div>
 
-                <div className="col-md-6">
-                  <label className="form-label">Where Sent To (after ICT)</label>
-                  <div className="d-flex gap-2">
-                    <select className="form-select" name="to_department" value={form.to_department || ''} onChange={handleChange}>
-                      <option value="">-- Select department (optional) --</option>
-                      {departments.map(d => <option key={d} value={d}>{d}</option>)}
-                    </select>
-                    <input type="text" className="form-control" name="destination" value={form.destination} onChange={handleChange} placeholder="Freeform destination (optional)" />
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700">Issue Comments</label>
+                <textarea rows="3" name="issue_comments" value={form.issue_comments || ''} onChange={handleChange} placeholder="Describe reported issues" className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Department to return replacement to</label>
+                <select name="to_department" value={form.to_department || ''} onChange={handleChange} className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2">
+                  <option value="">-- Select department --</option>
+                  {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Replacement item (optional - choose existing)</label>
+                <SearchBar placeholder="Search replacement item (optional)" onSelect={item => { if (item && item.id) setReplacementInventoryId(item.id); }} />
+                {replacementInventoryId && <div className="text-sm text-gray-500 mt-1">Selected replacement ID: {replacementInventoryId}</div>}
+              </div>
+
+              <div className="md:col-span-2">
+                <button type="button" className="inline-flex items-center gap-2 mt-2 px-3 py-2 border rounded-md text-sm" onClick={() => {
+                  const asset_type = window.prompt('Replacement asset type (e.g. Laptop):', 'Laptop');
+                  if (!asset_type) return;
+                  const serial_no = window.prompt('Replacement serial number (optional):', '');
+                  const manufacturer = window.prompt('Replacement manufacturer (optional):', '');
+                  const model = window.prompt('Replacement model (optional):', '');
+                  const status = window.prompt('Replacement status (Active/Stored):', 'Active');
+                  setReplacementDetails({ asset_type, serial_no, manufacturer, model, status });
+                }}>Create New Replacement</button>
+                {replacementDetails && <div className="text-sm text-gray-500 mt-2">Will create replacement: {replacementDetails.asset_type} {replacementDetails.model || ''}</div>}
+              </div>
+            </div>
+            <div className="mt-4">
+              <button type="submit" className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md" disabled={loading}>{loading ? 'Processing...' : 'Create Internal Replacement'}</button>
+            </div>
+          </form>
+        )}
+
+          {message && <div className="mt-4 px-4 py-2 bg-blue-50 text-blue-700 rounded">{message}</div>}
+
+        {/* Recent transfers list */}
+        <div className="mt-6">
+          <h3 className="text-lg font-medium mb-3">Recent Transfers</h3>
+          {(!transfers || transfers.length === 0) ? (
+            <div className="text-sm text-gray-500">No transfers yet.</div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {transfers.map(t => (
+                <div key={t.id} className="p-4 bg-gray-50 rounded-lg border">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="font-semibold">{t.asset_no || t.inventory_id || 'Item ' + t.inventory_id}</div>
+                      <div className="text-sm text-gray-500">{t.asset_type || ''} — {t.item_department || t.from_department}</div>
+                      <div className="text-xs text-gray-400 mt-1">Sent at: {t.sent_at}</div>
+                    </div>
+                    <div className="text-sm">
+                      <span className={`px-2 py-1 rounded text-xs ${t.status === 'Sent' ? 'bg-yellow-100 text-yellow-800' : t.status === 'Shipped' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>{t.status}</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex gap-2 flex-wrap">
+                    <button className="px-2 py-1 bg-green-600 text-white rounded text-sm" onClick={() => handleReceiveIct(t.id)}>Receive ICT</button>
+                    <button className="px-2 py-1 bg-blue-600 text-white rounded text-sm" onClick={() => handleShip(t.id)}>Ship</button>
+                    <button className="px-2 py-1 border rounded text-sm" onClick={() => handleAcknowledge(t.id)}>Acknowledge</button>
+                    <button className="px-2 py-1 border rounded text-sm" onClick={() => handleRecordsReceive(t.id)}>Mark Records Received</button>
+                    <button className="px-2 py-1 border rounded text-sm" onClick={() => handleCompleteReplacement(t.id)}>Complete Replacement</button>
                   </div>
                 </div>
-
-                <div className="col-md-6">
-                  <label className="form-label">From Department</label>
-                  <select className="form-select" name="from_department" value={form.from_department || ''} onChange={handleChange}>
-                    <option value="">-- Select origin department --</option>
-                    {departments.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                </div>
-
-              </div>
-              <button type="submit" className="btn btn-success mt-3" disabled={loading}>{loading ? 'Sending...' : 'Record Branch Transfer'}</button>
-            </form>
+              ))}
+            </div>
           )}
-
-          {/* Internal replacement form */}
-          {form.transfer_type === 'internal' && (
-            <form onSubmit={handleSend}>
-              <div className="row g-3">
-                <div className="col-md-6">
-                  <label className="form-label">Item being replaced (search)</label>
-                  <SearchBar placeholder="Search faulty item..." onSelect={handleSelectInventory} />
-                  {form.inventory_id && <div className="small text-muted mt-1">Selected faulty ID: {form.inventory_id}</div>}
-                </div>
-
-                <div className="col-md-6">
-                  <label className="form-label">Date Received</label>
-                  <input type="datetime-local" className="form-control" name="date_received" value={form.date_received} onChange={handleChange} />
-                </div>
-
-                <div className="col-md-6">
-                  <label className="form-label">Received By</label>
-                  <input className="form-control" name="received_by" value={form.received_by || ''} onChange={handleChange} placeholder="Technician or ICT staff" />
-                </div>
-
-                <div className="col-12">
-                  <label className="form-label">Issue Comments</label>
-                  <textarea className="form-control" rows="3" name="issue_comments" value={form.issue_comments || ''} onChange={handleChange} placeholder="Describe reported issues"></textarea>
-                </div>
-
-                <div className="col-md-6">
-                  <label className="form-label">Department to return replacement to</label>
-                  <select className="form-select" name="to_department" value={form.to_department || ''} onChange={handleChange}>
-                    <option value="">-- Select department --</option>
-                    {departments.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                </div>
-
-                <div className="col-md-6">
-                  <label className="form-label">Replacement item (optional - choose existing)</label>
-                  <SearchBar placeholder="Search replacement item (optional)" onSelect={item => { if (item && item.id) setReplacementInventoryId(item.id); }} />
-                  {replacementInventoryId && <div className="small text-muted mt-1">Selected replacement ID: {replacementInventoryId}</div>}
-                </div>
-
-                <div className="col-12">
-                  <button type="button" className="btn btn-outline-secondary me-2 mt-2" onClick={() => {
-                    // Prompt to create replacement details
-                    const asset_type = window.prompt('Replacement asset type (e.g. Laptop):', 'Laptop');
-                    if (!asset_type) return;
-                    const serial_no = window.prompt('Replacement serial number (optional):', '');
-                    const manufacturer = window.prompt('Replacement manufacturer (optional):', '');
-                    const model = window.prompt('Replacement model (optional):', '');
-                    const status = window.prompt('Replacement status (Active/Stored):', 'Active');
-                    setReplacementDetails({ asset_type, serial_no, manufacturer, model, status });
-                  }}>Create New Replacement</button>
-                  {replacementDetails && <div className="small text-muted mt-2">Will create replacement: {replacementDetails.asset_type} {replacementDetails.model || ''}</div>}
-                </div>
-
-              </div>
-              <button type="submit" className="btn btn-primary mt-3" disabled={loading}>{loading ? 'Processing...' : 'Create Internal Replacement'}</button>
-            </form>
-          )}
-
-          {message && <div className="alert alert-info mt-3">{message}</div>}
         </div>
       </div>
     </div>
