@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import SimpleModal from '../components/SimpleModal';
+import { useUser } from '../context/UserContext';
 
 const Users = () => {
   const [users, setUsers] = useState([]);
@@ -32,9 +33,7 @@ const Users = () => {
     fetchUsers();
   }, [navigate]);
 
-  const currentUser = useMemo(() => {
-    try { return JSON.parse(localStorage.getItem('user') || 'null'); } catch { return null; }
-  }, []);
+  const { currentUser } = useUser();
   const isAdmin = currentUser?.role === 'admin';
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3000); };

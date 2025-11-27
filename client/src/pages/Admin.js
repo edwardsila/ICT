@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useUser } from '../context/UserContext';
 import { useNavigate } from 'react-router-dom';
 
 // Tailwind/TailAdmin-styled Admin page: lists users and allows promote/demote
@@ -7,17 +8,20 @@ const Admin = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
+  const { currentUser, logout } = useUser();
 
   useEffect(() => {
-    if (!currentUser || currentUser.role !== 'admin') {
-      localStorage.removeItem('user');
+    if (!currentUser) {
       navigate('/login');
+      return;
+    }
+    if (currentUser.role !== 'admin') {
+      navigate('/');
       return;
     }
     loadUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentUser]);
 
   const loadUsers = async () => {
     setLoading(true);
@@ -25,8 +29,7 @@ const Admin = () => {
     try {
       const res = await fetch('/api/users', { credentials: 'include' });
       if (res.status === 401 || res.status === 403) {
-        localStorage.removeItem('user');
-        navigate('/login');
+        logout();
         return;
       }
       const data = await res.json();

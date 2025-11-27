@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useUser } from '../../context/UserContext';
 import SimpleModal from '../../components/SimpleModal';
 
 export default function AdminMaintenance() {
@@ -23,10 +24,7 @@ export default function AdminMaintenance() {
   const [page, setPage] = useState(1);
   const pageSize = 12;
 
-  const currentUser = useMemo(() => {
-    try { return JSON.parse(localStorage.getItem('user') || 'null'); } catch { return null; }
-  }, []);
-
+  const { currentUser } = useUser();
   const isAdmin = currentUser?.role === 'admin';
 
   const load = async () => {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './App.css';
@@ -15,15 +15,11 @@ import Register from './pages/Register';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
 import SearchBar from './components/SearchBar';
+import { useUser } from './context/UserContext';
 
 // Wrapper for Reports page to show message for non-admins
 function ReportsMessageWrapper() {
-  let currentUser = null;
-  try {
-    currentUser = JSON.parse(localStorage.getItem('user'));
-  } catch (e) {
-    currentUser = null;
-  }
+  const { currentUser } = useUser();
   if (currentUser && currentUser.role !== 'admin') {
     return (
       <div className="container py-5 text-center">
@@ -36,53 +32,34 @@ function ReportsMessageWrapper() {
 
 
 // Auth utility
-function isLoggedIn() {
-  return !!localStorage.getItem('user');
-}
-
 function ProtectedRoute({ element, adminOnly }) {
+  const { currentUser } = useUser();
   const navigate = useNavigate();
-  let currentUser = null;
-  try {
-    currentUser = JSON.parse(localStorage.getItem('user'));
-  } catch {}
-  useEffect(() => {
-    if (!isLoggedIn()) {
+  React.useEffect(() => {
+    if (!currentUser) {
       navigate('/login', { replace: true });
     } else if (adminOnly && currentUser?.role !== 'admin') {
       navigate('/');
     }
-  }, [navigate, adminOnly]);
-  if (!isLoggedIn()) return null;
+  }, [navigate, adminOnly, currentUser]);
+  if (!currentUser) return null;
   if (adminOnly && currentUser?.role !== 'admin') return null;
   return element;
 }
 
 
-const mwalimuLogo = 'https://imgs.search.brave.com/f1dIw44rlZWslko55CbuopR9Ai9WhBhPKxWq2NsaqEU/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9wbGF5/LWxoLmdvb2dsZXVz/ZXJjb250ZW50LmNv/bS90aGRkZ1FCc0RD/dTRhTi1qX0V4a1VV/ZVRKNTRyOFBsaTI2/a3FqTU5mT29YYm9V/cXZQREtIX3hjdkZw/bEVyaXV4U2hyMz13/MjQwLWg0ODAtcnc';
-
+//const mwalimuLogo = 'https://imgs.search.brave.com/f1dIw44rlZWslko55CbuopR9Ai9WhBhPKxWq2NsaqEU/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9wbGF5/LWxoLmdvb2dsZXVz/ZXJjb250ZW50LmNv/bS90aGRkZ1FCc0RD/dTRhTi1qX0V4a1VV/ZVRKNTRyOFBsaTI2/a3FqTU5mT29YYm9V/cXZQREtIX3hjdkZw/bEVyaXV4U2hyMz13/MjQwLWg0ODAtcnc';
+const mwalimuLogo = 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQjZKdidm0_Xqrr4n3mhG7FxvwPLOlLO8NU8Q&s'
 
 
 
 
 function App() {
-  // Get current user
-  let currentUser = null;
-  try {
-    currentUser = JSON.parse(localStorage.getItem('user'));
-  } catch {}
+  const { currentUser, logout } = useUser();
 
-  // Logout handler
-  async function handleLogout() {
-    try {
-      await fetch('/api/logout', { method: 'POST', credentials: 'include' });
-    } catch (e) {}
-    localStorage.removeItem('user');
-    window.location.href = '/login';
-  }
-
-  function ModernHome({ currentUser }) {
-  const [query, setQuery] = useState('');
+    function ModernHome() {
+  const [query, setQuery] = React.useState('');
+  const { currentUser } = useUser();
     const [stats, setStats] = useState({ total: '—', in_repair: '—', pending_transfers: '—' });
     const [recent, setRecent] = useState([]);
   // We'll use window.location for navigation from the hero
@@ -156,25 +133,35 @@ function App() {
                 <li className="list-inline-item mx-3 text-light"><i className="bi bi-people-fill me-2"></i>Sacco-friendly policies</li>
               </ul>
             </div>
-            {/* Workflow: Add item -> Assign -> Track -> Maintain -> Retire */}
-            <div className="mt-6 max-w-4xl mx-auto bg-white/30 backdrop-blur rounded-xl p-4 shadow-sm">
-              <div className="flex items-center justify-between gap-3 overflow-x-auto">
-                {[
-                  { title: 'Receive', desc: 'Item arrives', icon: 'bi-box-seam' },
-                  { title: 'Add', desc: 'Add to inventory', icon: 'bi-plus-circle' },
-                  { title: 'Assign', desc: 'Assign to department', icon: 'bi-people' },
-                  { title: 'Transfer', desc: 'Ship/receive', icon: 'bi-arrow-left-right' },
-                  { title: 'Maintain', desc: 'Send to ICT', icon: 'bi-tools' },
-                  { title: 'Complete', desc: 'Return or retire', icon: 'bi-check2-circle' }
-                ].map((s, i) => (
-                  <div key={s.title} className="flex-1 min-w-[140px] text-center p-3">
-                    <div className="mx-auto w-12 h-12 rounded-full bg-white shadow flex items-center justify-center text-green-600 mb-2"><i className={`bi ${s.icon} fs-4`}></i></div>
-                    <div className="font-semibold text-sm">{s.title}</div>
-                    <div className="text-xs text-gray-100">{s.desc}</div>
-                    {i < 5 && <div className="hidden md:block text-gray-300 mt-3">→</div>}
+            {/* Workflow: icon-only stepper with directional arrows */}
+            <div className="mt-6">
+              {(() => {
+                const steps = [
+                  { title: 'Receive', icon: 'bi-box-seam' },
+                  { title: 'Add', icon: 'bi-plus-circle' },
+                  { title: 'Assign', icon: 'bi-people' },
+                  { title: 'Transfer', icon: 'bi-arrow-left-right' },
+                  { title: 'Maintain', icon: 'bi-tools' },
+                  { title: 'Complete', icon: 'bi-check2-circle' }
+                ];
+                return (
+                  <div className="flex justify-center items-center gap-3">
+                    {steps.map((s, idx) => (
+                      <React.Fragment key={s.title}>
+                        <div className="text-center">
+                          <div className="w-14 h-14 rounded-full bg-white shadow flex items-center justify-center text-green-600 text-2xl mx-auto hover:scale-105 transition-transform">
+                            <i className={`bi ${s.icon}`}></i>
+                          </div>
+                          <div className="text-xs text-gray-200 mt-2 hidden md:block">{s.title}</div>
+                        </div>
+                        {idx < steps.length - 1 && (
+                          <div className="text-gray-200 text-2xl mx-2 hidden sm:block"><i className="bi bi-chevron-right"></i></div>
+                        )}
+                      </React.Fragment>
+                    ))}
                   </div>
-                ))}
-              </div>
+                );
+              })()}
             </div>
           </div>
 
@@ -292,10 +279,10 @@ function App() {
                 )}
               </ul>
               {/* Account dropdown */}
-              {isLoggedIn() ? (
+              {currentUser ? (
                 <div className="d-flex align-items-center gap-2 ms-3">
                   <span className="text-light fw-bold"><i className="bi bi-person-circle me-1"></i>{currentUser?.username}</span>
-                  <button className="btn btn-outline-light" onClick={handleLogout}>Logout</button>
+                  <button className="btn btn-outline-light" onClick={logout}>Logout</button>
                 </div>
               ) : (
                 <Dropdown className="ms-3">

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import SearchBar from '../components/SearchBar';
+import { useUser } from '../context/UserContext';
 
 const Transfers = () => {
   const [transfers, setTransfers] = useState([]);
@@ -10,6 +11,7 @@ const Transfers = () => {
   const [replacementInventoryId, setReplacementInventoryId] = useState(null);
   const [replacementDetails, setReplacementDetails] = useState(null);
   const [departments, setDepartments] = useState([]);
+  const { currentUser } = useUser();
 
   // Departments list not required for branch-first flow (kept on server side)
 
@@ -54,7 +56,7 @@ const Transfers = () => {
   const handleSend = async e => {
     e.preventDefault();
     setMessage('');
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const user = currentUser || {};
     // Build payload depending on transfer type
     let payload = { transfer_type: form.transfer_type, sent_by: user?.username || 'Unknown', from_department: form.from_department || 'UNASSIGNED' };
     if (form.transfer_type === 'branch') {
@@ -86,7 +88,6 @@ const Transfers = () => {
         notes: form.notes || ''
       };
     } else {
-      // Fallback generic payload
       payload = { ...payload, inventory_id: form.inventory_id || null, to_department: form.to_department || '', destination: form.destination || '', notes: form.notes || '' };
     }
 
@@ -164,7 +165,7 @@ const Transfers = () => {
   };
 
   const handleAcknowledge = async (id) => {
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const user = currentUser || {};
     try {
       const res = await fetch(`/api/transfers/${id}/acknowledge`, {
         method: 'POST',
