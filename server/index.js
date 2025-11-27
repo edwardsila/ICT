@@ -645,16 +645,21 @@ app.delete('/api/users/:id', requireLogin, (req, res) => {
 
   // Ensure we won't remove the last admin
   db.get("SELECT COUNT(*) as cnt FROM users WHERE role = 'admin'", [], (cErr, row) => {
+    console.log('[DEBUG] DELETE /api/users/:id actor=', actor, 'targetId=', targetId);
     if (cErr) return res.status(500).json({ error: cErr.message });
     const adminCount = (row && row.cnt) ? Number(row.cnt) : 0;
+    console.log('[DEBUG] current adminCount=', adminCount);
     // If target user is an admin and there's only one admin left, block deletion
     db.get('SELECT role FROM users WHERE id = ?', [targetId], (gErr, uRow) => {
+      if (gErr) console.error('[DEBUG] error fetching target user role', gErr);
       if (gErr) return res.status(500).json({ error: gErr.message });
       if (!uRow) return res.status(404).json({ error: 'User not found' });
       const targetIsAdmin = String(uRow.role) === 'admin';
+      console.log('[DEBUG] targetIsAdmin=', targetIsAdmin, 'targetRole=', uRow.role);
       if (targetIsAdmin && adminCount <= 1) return res.status(400).json({ error: 'Cannot delete the last admin user' });
 
       db.run('DELETE FROM users WHERE id = ?', [targetId], function(err) {
+        if (err) console.error('[DEBUG] error deleting user', err);
         if (err) return res.status(500).json({ error: err.message });
         res.json({ deleted: this.changes });
       });
