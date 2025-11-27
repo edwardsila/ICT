@@ -29,8 +29,8 @@ export default function AdminSidebar({ mobileOpen = false, onClose = () => {}, c
                   to={it.to}
                   end={it.to === '/admin'}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium ${isActive ? 'bg-gray-200 text-gray-900' : 'text-gray-700 hover:bg-gray-50'}`
-                  }
+                      `flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium no-underline ${isActive ? 'bg-gray-200 text-gray-900' : 'text-gray-700 hover:bg-gray-50'}`
+                    }
                 >
                   <i className={`bi ${it.icon || 'bi-speedometer2'} text-lg text-gray-500`}></i>
                   <span>{it.label}</span>
@@ -65,7 +65,7 @@ export default function AdminSidebar({ mobileOpen = false, onClose = () => {}, c
                     end={it.to === '/admin'}
                     onClick={onClose}
                     className={({ isActive }) =>
-                      `flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium ${isActive ? 'bg-gray-200 text-gray-900' : 'text-gray-700 hover:bg-gray-50'}`
+                      `flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium no-underline ${isActive ? 'bg-gray-200 text-gray-900' : 'text-gray-700 hover:bg-gray-50'}`
                     }
                   >
                     <i className={`bi ${it.icon || 'bi-speedometer2'} text-lg text-gray-500`}></i>

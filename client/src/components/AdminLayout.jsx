@@ -8,6 +8,7 @@ import AdminMaintenance from '../pages/admin/MaintenanceAdmin';
 import AdminTransfers from '../pages/admin/TransfersAdmin';
 import AdminReports from '../pages/admin/ReportsAdmin';
 import AdminSettings from '../pages/admin/SettingsAdmin';
+import BackToDashboard from './BackToDashboard';
 
 export default function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -32,6 +33,7 @@ export default function AdminLayout() {
         </div>
 
         <main className="p-6 max-w-7xl mx-auto">
+          <BackToDashboard />
           <Routes>
             <Route index element={<AdminOverview />} />
             <Route path="users" element={<AdminUsers />} />
