@@ -206,10 +206,10 @@ const Maintenance = () => {
                     <label className="block text-sm font-medium text-gray-700">Equipment</label>
                     <input type="text" className="mt-1 block w-full rounded-md border-gray-300 px-3 py-2 bg-gray-50" name="equipment" value={form.equipment} readOnly />
                   </div>
-                  <div className="col-md-6">
-                    <label className="form-label">Tag Number(MNSSXXX)</label>
-                    <div className="d-flex gap-2">
-                      <div style={{flex: 1}}>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700">Tag Number (MNSSXXX)</label>
+                    <div className="flex gap-2 mt-1">
+                      <div className="w-full">
                         <SearchBar
                           placeholder="Search by asset no, serial, model or manufacturer..."
                           value={form.tagnumber || ''}
@@ -239,18 +239,17 @@ const Maintenance = () => {
                         />
                       </div>
                       <div>
-                        <button type="button" className="btn btn-outline-secondary" title="Lookup tag in inventory" onClick={() => { lookupTag(form.tagnumber); }}>
+                        <button type="button" className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-gray-600 hover:bg-gray-50" title="Lookup tag in inventory" onClick={() => { lookupTag(form.tagnumber); }}>
                           <i className="bi bi-search"></i>
                         </button>
                       </div>
                     </div>
                     {form.inventory_id && (
-                      <div className="mt-2 d-flex align-items-center gap-2">
-                        <span className="badge bg-success">Inventory ID: {form.inventory_id}</span>
-                        <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => { setPreviewId(form.inventory_id); setPreviewOpen(true); }}>Preview</button>
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="inline-block bg-green-100 text-green-800 px-2 py-0.5 rounded">Inventory ID: {form.inventory_id}</span>
+                        <button type="button" className="inline-flex items-center px-2 py-1 border border-indigo-600 text-indigo-600 rounded text-sm" onClick={() => { setPreviewId(form.inventory_id); setPreviewOpen(true); }}>Preview</button>
                       </div>
                     )}
-                    <div className="form-text">Search inventory and pick an item to populate device details for maintenance. You can also type a tag and blur to lookup.</div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Department</label>
@@ -309,9 +308,11 @@ const Maintenance = () => {
                 </>
               )}
             </div>
-            <button type="submit" className="btn btn-success mt-3 w-100">Add Record</button>
+            <div className="mt-4">
+              <button type="submit" className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded w-full md:w-auto">Add Record</button>
+            </div>
           </form>
-          {message && <div className="alert alert-info mt-3">{message} {lastNotFoundTag && (<Link to={`/inventory?serial=${encodeURIComponent(lastNotFoundTag)}`} className="btn btn-link">Add device</Link>)}</div>}
+          {message && <div className="mt-3 px-4 py-2 bg-blue-50 text-blue-700 rounded">{message} {lastNotFoundTag && (<Link to={`/inventory?serial=${encodeURIComponent(lastNotFoundTag)}`} className="underline text-indigo-600">Add device</Link>)}</div>}
         </div>
       <InventoryPreview id={previewId} open={previewOpen} onClose={() => { setPreviewOpen(false); setPreviewId(null); }} />
     </div>
