@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import AdminNav from '../components/AdminNav';
 
 // Tailwind/TailAdmin-styled Admin page: lists users and allows promote/demote
 const Admin = () => {
@@ -67,6 +68,9 @@ const Admin = () => {
         </div>
         <div className="text-sm text-gray-600">Signed in as <span className="font-medium">{currentUser?.username}</span></div>
       </div>
+
+      {/* Admin navigation */}
+      <AdminNav />
 
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <div className="px-6 py-4 border-b">

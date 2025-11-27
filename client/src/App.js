@@ -8,6 +8,7 @@ import Inventory from './pages/Inventory';
 import Maintenance from './pages/Maintenance';
 import Reports from './pages/Reports';
 import Admin from './pages/Admin';
+import AdminLayout from './components/AdminLayout';
 import Transfers from './pages/Transfers';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -300,7 +301,7 @@ function App() {
             <Route path="/inventory" element={<ProtectedRoute element={<Inventory />} />} />
             <Route path="/maintenance" element={<ProtectedRoute element={<Maintenance />} />} />
             <Route path="/reports" element={<ProtectedRoute element={<ReportsMessageWrapper />} adminOnly={true} />} />
-            <Route path="/admin" element={<ProtectedRoute element={<Admin />} adminOnly={true} />} />
+            <Route path="/admin/*" element={<ProtectedRoute element={<AdminLayout />} adminOnly={true} />} />
             <Route path="/transfers" element={<ProtectedRoute element={<Transfers />} />} />
             <Route path="/users" element={<ProtectedRoute element={<Users />} />} />
             <Route path="/settings" element={<ProtectedRoute element={<Settings />} />} />
