@@ -634,6 +634,34 @@ app.put('/api/users/:id', requireLogin, (req, res) => {
   });
 });
 
+// Delete a user (admin-only). Prevent deleting yourself and prevent removing the last admin.
+app.delete('/api/users/:id', requireLogin, (req, res) => {
+  const actor = req.session?.user;
+  if (!actor || actor.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+  const { id } = req.params;
+  if (!id || isNaN(Number(id))) return res.status(400).json({ error: 'Invalid user id' });
+  const targetId = Number(id);
+  if (actor.id === targetId) return res.status(400).json({ error: 'Cannot delete yourself' });
+
+  // Ensure we won't remove the last admin
+  db.get("SELECT COUNT(*) as cnt FROM users WHERE role = 'admin'", [], (cErr, row) => {
+    if (cErr) return res.status(500).json({ error: cErr.message });
+    const adminCount = (row && row.cnt) ? Number(row.cnt) : 0;
+    // If target user is an admin and there's only one admin left, block deletion
+    db.get('SELECT role FROM users WHERE id = ?', [targetId], (gErr, uRow) => {
+      if (gErr) return res.status(500).json({ error: gErr.message });
+      if (!uRow) return res.status(404).json({ error: 'User not found' });
+      const targetIsAdmin = String(uRow.role) === 'admin';
+      if (targetIsAdmin && adminCount <= 1) return res.status(400).json({ error: 'Cannot delete the last admin user' });
+
+      db.run('DELETE FROM users WHERE id = ?', [targetId], function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ deleted: this.changes });
+      });
+    });
+  });
+});
+
 // Admin-only: create department
 app.post('/api/departments', requireLogin, (req, res) => {
   const user = req.session?.user;
