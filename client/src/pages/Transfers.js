@@ -9,12 +9,24 @@ const Transfers = () => {
   const [loading, setLoading] = useState(false);
   const [replacementInventoryId, setReplacementInventoryId] = useState(null);
   const [replacementDetails, setReplacementDetails] = useState(null);
+  const [departments, setDepartments] = useState([]);
 
   // Departments list not required for branch-first flow (kept on server side)
 
   useEffect(() => {
     fetchTransfers();
+    fetchDepartments();
   }, []);
+
+  const fetchDepartments = async () => {
+    try {
+      const res = await fetch('/api/departments', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setDepartments(Array.isArray(data) ? data.map(d => d.name) : []);
+      }
+    } catch (err) { console.error('Failed to load departments', err); }
+  };
 
   
 
@@ -57,6 +69,7 @@ const Transfers = () => {
         date_received: toIso(form.date_received) || null,
         date_sent: toIso(form.date_sent) || null,
         destination: form.destination || '',
+        to_department: form.to_department || form.destination || 'UNASSIGNED',
         notes: form.notes || ''
       };
     } else if (form.transfer_type === 'internal') {
@@ -260,12 +273,21 @@ const Transfers = () => {
 
                 <div className="col-md-6">
                   <label className="form-label">Where Sent To (after ICT)</label>
-                  <input type="text" className="form-control" name="destination" value={form.destination} onChange={handleChange} placeholder="e.g., Branch name or department" />
+                  <div className="d-flex gap-2">
+                    <select className="form-select" name="to_department" value={form.to_department || ''} onChange={handleChange}>
+                      <option value="">-- Select department (optional) --</option>
+                      {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                    <input type="text" className="form-control" name="destination" value={form.destination} onChange={handleChange} placeholder="Freeform destination (optional)" />
+                  </div>
                 </div>
 
                 <div className="col-md-6">
                   <label className="form-label">From Department</label>
-                  <input className="form-control" name="from_department" value={form.from_department} onChange={handleChange} placeholder="Origin department" />
+                  <select className="form-select" name="from_department" value={form.from_department || ''} onChange={handleChange}>
+                    <option value="">-- Select origin department --</option>
+                    {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
                 </div>
 
               </div>
@@ -300,7 +322,10 @@ const Transfers = () => {
 
                 <div className="col-md-6">
                   <label className="form-label">Department to return replacement to</label>
-                  <input className="form-control" name="to_department" value={form.to_department || ''} onChange={handleChange} placeholder="e.g., BANK, HR" />
+                  <select className="form-select" name="to_department" value={form.to_department || ''} onChange={handleChange}>
+                    <option value="">-- Select department --</option>
+                    {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
                 </div>
 
                 <div className="col-md-6">

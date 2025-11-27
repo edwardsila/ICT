@@ -12,6 +12,10 @@ export default function SearchBar({ placeholder = 'Search...', onSelect, value, 
   const [cachedInventory, setCachedInventory] = useState(null);
   const timerRef = useRef(null);
   const inputRef = useRef(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewItem, setPreviewItem] = useState(null);
+  const [previewDetails, setPreviewDetails] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   useEffect(() => {
     if (!query || query.trim().length < 2) {
@@ -96,12 +100,48 @@ export default function SearchBar({ placeholder = 'Search...', onSelect, value, 
   }
 
   function chooseSuggestion(item) {
-    // If caller provided onSelect, call it; otherwise navigate to inventory detail if id present
-    if (onSelect) return onSelect(item);
+    // If caller provided onSelect, call it
+    if (onSelect) {
+      try { onSelect(item); } catch (e) { /* ignore */ }
+      // close suggestions after select
+      setOpen(false);
+      setSuggestions([]);
+      setSelected(-1);
+      return;
+    }
+    // Otherwise open an inline preview (modern slide-over) for the selected inventory item
     if (item?.id) {
-      window.location.href = `/inventory?itemId=${encodeURIComponent(item.id)}`;
+      setPreviewItem(item);
+      setPreviewOpen(true);
+      // close suggestions when opening preview
+      setOpen(false);
+      setSuggestions([]);
+      setSelected(-1);
     }
   }
+
+  // fetch preview details when previewItem changes
+  useEffect(() => {
+    if (!previewItem || !previewItem.id) {
+      setPreviewDetails(null);
+      setPreviewLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setPreviewLoading(true);
+      try {
+        const res = await fetch(`/api/inventory/${encodeURIComponent(previewItem.id)}`, { credentials: 'include' });
+        if (!res.ok) {
+          setPreviewDetails(null);
+        } else {
+          const d = await res.json(); if (!cancelled) setPreviewDetails(d);
+        }
+      } catch (e) { if (!cancelled) setPreviewDetails(null); }
+      if (!cancelled) setPreviewLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [previewItem]);
 
   return (
     <div className="search-bar position-relative" style={{maxWidth: 760, width: '100%'}}>
@@ -136,8 +176,9 @@ export default function SearchBar({ placeholder = 'Search...', onSelect, value, 
       </div>
 
       {open && (
-        <div className="suggestions card shadow mt-1">
-          <ul className="list-group list-group-flush" role="listbox">
+        <div style={{position: 'absolute', left: 0, right: 0, marginTop: 6, zIndex: 9999}}>
+          <div className="card shadow" style={{overflow: 'hidden'}}>
+            <ul className="list-group list-group-flush" role="listbox">
             {loading && (
               <li className="list-group-item small text-muted">Searching...</li>
             )}
@@ -160,7 +201,48 @@ export default function SearchBar({ placeholder = 'Search...', onSelect, value, 
                 {s.type && <span className="badge bg-light text-dark ms-2">{s.type}</span>}
               </li>
             ))}
-          </ul>
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* Inline preview slide-over when no onSelect provided */}
+      {previewOpen && previewItem && (
+        <div style={{position: 'fixed', top: 0, right: 0, height: '100vh', width: 420, zIndex: 10000}}>
+          <div style={{position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)'}} onClick={() => { setPreviewOpen(false); setPreviewItem(null); setPreviewDetails(null); }} />
+          <div className="bg-white shadow-lg h-full overflow-auto" style={{width: 420, right: 0, position: 'relative'}}>
+            <div className="p-4 border-b d-flex align-items-center justify-content-between">
+              <h5 className="mb-0">Item Preview</h5>
+              <button className="btn btn-sm" onClick={() => { setPreviewOpen(false); setPreviewItem(null); setPreviewDetails(null); }}><i className="bi bi-x-lg"></i></button>
+            </div>
+            <div className="p-3">
+              {previewLoading ? (
+                <div className="text-muted">Loading...</div>
+              ) : previewDetails ? (
+                <div>
+                  <div className="fw-bold mb-1">{previewDetails.asset_no} — {previewDetails.asset_type}</div>
+                  <div className="small text-muted mb-2">{previewDetails.manufacturer || ''} {previewDetails.model || ''} {previewDetails.serial_no ? `• SN: ${previewDetails.serial_no}` : ''}</div>
+                  <div className="mb-2">Department: <strong>{previewDetails.department}</strong></div>
+                  <div className="mb-2">Status: <span className="badge bg-secondary">{previewDetails.status}</span></div>
+                  <div className="mb-3"><div className="small text-muted">OS / Info</div><div>{previewDetails.os_info || '—'}</div></div>
+                  <div className="d-flex gap-2">
+                    <a className="btn btn-sm btn-primary" href={`/inventory?itemId=${previewDetails.id}`}>Open</a>
+                    <a className="btn btn-sm btn-outline-secondary" href={`/inventory?edit=${previewDetails.id}`}>Edit</a>
+                    <button className="btn btn-sm btn-outline-danger" onClick={async () => {
+                      // quick delete from preview (confirm)
+                      if (!window.confirm('Delete this item?')) return;
+                      try {
+                        const r = await fetch(`/api/inventory/${previewDetails.id}`, { method: 'DELETE', credentials: 'include' });
+                        if (r.ok) { alert('Deleted'); window.location.reload(); } else { const d = await r.json().catch(()=>({})); alert(d.error||'Delete failed'); }
+                      } catch (e) { alert('Delete failed'); }
+                    }}>Delete</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-muted">No details</div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import SearchBar from '../components/SearchBar';
+import InventoryPreview from '../components/InventoryPreview';
 
 const Maintenance = () => {
   const [activeTab, setActiveTab] = useState('device'); // 'device' or 'department'
@@ -28,6 +29,8 @@ const Maintenance = () => {
   const [inventoryList, setInventoryList] = useState([]);
   const [message, setMessage] = useState('');
   const [lastNotFoundTag, setLastNotFoundTag] = useState('');
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewId, setPreviewId] = useState(null);
   React.useEffect(() => {
     async function loadDepts() {
       try {
@@ -224,8 +227,9 @@ const Maintenance = () => {
                       </div>
                     </div>
                     {form.inventory_id && (
-                      <div className="mt-2">
+                      <div className="mt-2 d-flex align-items-center gap-2">
                         <span className="badge bg-success">Inventory ID: {form.inventory_id}</span>
+                        <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => { setPreviewId(form.inventory_id); setPreviewOpen(true); }}>Preview</button>
                       </div>
                     )}
                     <div className="form-text">Search inventory and pick an item to populate device details for maintenance. You can also type a tag and blur to lookup.</div>
@@ -292,6 +296,7 @@ const Maintenance = () => {
           {message && <div className="alert alert-info mt-3">{message} {lastNotFoundTag && (<Link to={`/inventory?serial=${encodeURIComponent(lastNotFoundTag)}`} className="btn btn-link">Add device</Link>)}</div>}
         </div>
       </div>
+        <InventoryPreview id={previewId} open={previewOpen} onClose={() => { setPreviewOpen(false); setPreviewId(null); }} />
     </div>
   );
 };

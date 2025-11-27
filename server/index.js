@@ -147,6 +147,7 @@ const createTables = (cb) => {
         const colNames = (cols || []).map(c => c.name);
         const toAdd = [];
         if (!colNames.includes('date_received')) toAdd.push("ALTER TABLE transfers ADD COLUMN date_received TEXT");
+        if (!colNames.includes('destination')) toAdd.push("ALTER TABLE transfers ADD COLUMN destination TEXT");
         if (!colNames.includes('date_sent')) toAdd.push("ALTER TABLE transfers ADD COLUMN date_sent TEXT");
   if (!colNames.includes('transfer_type')) toAdd.push("ALTER TABLE transfers ADD COLUMN transfer_type TEXT");
         if (!colNames.includes('repaired_status')) toAdd.push("ALTER TABLE transfers ADD COLUMN repaired_status TEXT");
