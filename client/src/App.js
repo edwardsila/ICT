@@ -137,7 +137,9 @@ function App() {
             </svg>
           </div>
           <div className="container hero-content text-center text-light py-5 animate-shake">
-            <img className="animate-pop" src={mwalimuLogo} alt="Mwalimu Sacco Logo" style={{height: '100px', maxWidth: '280px', marginBottom: '16px', borderRadius: '16px', boxShadow: '0 8px 40px rgba(0,0,0,0.2)', background: 'rgba(255,255,255,0.95)', padding: '8px'}} />
+            <div className="flex justify-center">
+              <img className="animate-pop" src={mwalimuLogo} alt="Mwalimu Sacco Logo" style={{display: 'block', height: '100px', maxWidth: '280px', margin: '0 auto 16px', borderRadius: '16px', boxShadow: '0 8px 40px rgba(0,0,0,0.2)', background: 'rgba(255,255,255,0.95)', padding: '8px'}} />
+            </div>
             <h1 className="fw-bold mb-2 text-gradient animate-fade-up" style={{fontSize: '2.6rem', animationDelay: '0.08s'}}>Mwalimu National ICT</h1>
             <p className="lead mb-3 animate-fade-up" style={{maxWidth: '820px', margin: '0 auto', animationDelay: '0.12s'}}>A simple, fast system to manage your assets, maintenance and transfers. Secure, auditable and built for the MWALIMU community.</p>
             <div className="d-flex justify-content-center mt-4">
@@ -154,27 +156,48 @@ function App() {
                 <li className="list-inline-item mx-3 text-light"><i className="bi bi-people-fill me-2"></i>Sacco-friendly policies</li>
               </ul>
             </div>
+            {/* Workflow: Add item -> Assign -> Track -> Maintain -> Retire */}
+            <div className="mt-6 max-w-4xl mx-auto bg-white/30 backdrop-blur rounded-xl p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-3 overflow-x-auto">
+                {[
+                  { title: 'Receive', desc: 'Item arrives', icon: 'bi-box-seam' },
+                  { title: 'Add', desc: 'Add to inventory', icon: 'bi-plus-circle' },
+                  { title: 'Assign', desc: 'Assign to department', icon: 'bi-people' },
+                  { title: 'Transfer', desc: 'Ship/receive', icon: 'bi-arrow-left-right' },
+                  { title: 'Maintain', desc: 'Send to ICT', icon: 'bi-tools' },
+                  { title: 'Complete', desc: 'Return or retire', icon: 'bi-check2-circle' }
+                ].map((s, i) => (
+                  <div key={s.title} className="flex-1 min-w-[140px] text-center p-3">
+                    <div className="mx-auto w-12 h-12 rounded-full bg-white shadow flex items-center justify-center text-green-600 mb-2"><i className={`bi ${s.icon} fs-4`}></i></div>
+                    <div className="font-semibold text-sm">{s.title}</div>
+                    <div className="text-xs text-gray-100">{s.desc}</div>
+                    {i < 5 && <div className="hidden md:block text-gray-300 mt-3">→</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
+
         </div>
 
         <div className="container py-5">
           <div className="row mb-4 g-3">
             <div className="col-md-4">
-              <div className="stat-card p-3 text-center shadow-sm rounded">
-                <div className="h1 mb-0">{stats.total}</div>
-                <div className="small text-muted">Total assets</div>
+              <div className="p-3 text-center rounded-xl shadow-sm bg-white">
+                <div className="text-3xl font-bold mb-0">{stats.total}</div>
+                <div className="text-xs text-gray-500">Total assets</div>
               </div>
             </div>
             <div className="col-md-4">
-              <div className="stat-card p-3 text-center shadow-sm rounded">
-                <div className="h1 mb-0">{stats.in_repair}</div>
-                <div className="small text-muted">In repair</div>
+              <div className="p-3 text-center rounded-xl shadow-sm bg-white">
+                <div className="text-3xl font-bold mb-0">{stats.in_repair}</div>
+                <div className="text-xs text-gray-500">In repair</div>
               </div>
             </div>
             <div className="col-md-4">
-              <div className="stat-card p-3 text-center shadow-sm rounded">
-                <div className="h1 mb-0">{stats.pending_transfers}</div>
-                <div className="small text-muted">Pending transfers</div>
+              <div className="p-3 text-center rounded-xl shadow-sm bg-white">
+                <div className="text-3xl font-bold mb-0">{stats.pending_transfers}</div>
+                <div className="text-xs text-gray-500">Pending transfers</div>
               </div>
             </div>
           </div>
@@ -182,33 +205,27 @@ function App() {
           <h4 className="mb-3">Quick access</h4>
             <div className="row g-4 justify-content-center">
             <div className="col-md-4">
-              <div className="card interactive-card shadow h-100 text-center stagger-pop" style={{'--delay': '0.34s'}}>
-                <div className="card-body">
-                  <i className="bi bi-box-seam display-4 text-success mb-3"></i>
-                  <h4 className="mb-2">Inventory</h4>
-                  <p>Add and manage ICT equipment.</p>
-                  <Link to="/inventory" className="btn btn-success w-100">Manage Inventory</Link>
-                </div>
+              <div className="rounded-xl overflow-hidden shadow hover:shadow-lg bg-white h-100 text-center p-4">
+                <div className="text-4xl text-green-600 mb-3"><i className="bi bi-box-seam"></i></div>
+                <h4 className="mb-2">Inventory</h4>
+                <p className="text-sm text-gray-600">Add and manage ICT equipment.</p>
+                <Link to="/inventory" className="inline-block mt-3 px-4 py-2 bg-green-600 text-white rounded w-full">Manage Inventory</Link>
               </div>
             </div>
             <div className="col-md-4">
-              <div className="card interactive-card shadow h-100 text-center stagger-pop" style={{'--delay': '0.38s'}}>
-                <div className="card-body">
-                  <i className="bi bi-tools display-4 text-warning mb-3"></i>
-                  <h4 className="mb-2">Maintenance</h4>
-                  <p>Log and review maintenance activities.</p>
-                  <Link to="/maintenance" className="btn btn-warning w-100">Go to Maintenance</Link>
-                </div>
+              <div className="rounded-xl overflow-hidden shadow hover:shadow-lg bg-white h-100 text-center p-4">
+                <div className="text-4xl text-yellow-500 mb-3"><i className="bi bi-tools"></i></div>
+                <h4 className="mb-2">Maintenance</h4>
+                <p className="text-sm text-gray-600">Log and review maintenance activities.</p>
+                <Link to="/maintenance" className="inline-block mt-3 px-4 py-2 bg-yellow-500 text-white rounded w-full">Go to Maintenance</Link>
               </div>
             </div>
             <div className="col-md-4">
-              <div className="card interactive-card shadow h-100 text-center stagger-pop" style={{'--delay': '0.42s'}}>
-                <div className="card-body">
-                  <i className="bi bi-arrow-left-right display-4 text-secondary mb-3"></i>
-                  <h4 className="mb-2">Transfers</h4>
-                  <p>Track and send items between departments.</p>
-                  <Link to="/transfers" className="btn btn-secondary w-100">Go to Transfers</Link>
-                </div>
+              <div className="rounded-xl overflow-hidden shadow hover:shadow-lg bg-white h-100 text-center p-4">
+                <div className="text-4xl text-gray-600 mb-3"><i className="bi bi-arrow-left-right"></i></div>
+                <h4 className="mb-2">Transfers</h4>
+                <p className="text-sm text-gray-600">Track and send items between departments.</p>
+                <Link to="/transfers" className="inline-block mt-3 px-4 py-2 bg-gray-700 text-white rounded w-full">Go to Transfers</Link>
               </div>
             </div>
           </div>
@@ -220,18 +237,18 @@ function App() {
             )}
             {recent.map((item, idx) => (
               <div className="col-md-4" key={item.id}>
-                <div className="card small-card h-100 stagger" style={{'--delay': `${0.44 + idx * 0.04}s`}}>
-                  <div className="card-body d-flex align-items-start">
-                    <div className="me-3">
-                      <i className="bi bi-hdd display-6 text-primary"></i>
-                    </div>
-                    <div>
-                      <div className="fw-bold">{item.asset_no || item.asset_type}</div>
-                      <div className="small text-muted">{item.manufacturer || ''} {item.model || ''}</div>
-                      <div className="mt-2"><Link to={`/inventory?itemId=${item.id}`} className="stretched-link">View</Link></div>
+                <div className="rounded-xl overflow-hidden shadow-sm bg-white h-100 stagger" style={{'--delay': `${0.44 + idx * 0.04}s`}}>
+                    <div className="p-3 d-flex align-items-start">
+                      <div className="me-3">
+                        <i className="bi bi-hdd display-6 text-primary"></i>
+                      </div>
+                      <div>
+                        <div className="fw-bold">{item.asset_no || item.asset_type}</div>
+                        <div className="small text-muted">{item.manufacturer || ''} {item.model || ''}</div>
+                        <div className="mt-2"><Link to={`/inventory?itemId=${item.id}`} className="stretched-link">View</Link></div>
+                      </div>
                     </div>
                   </div>
-                </div>
               </div>
             ))}
           </div>
@@ -312,9 +329,33 @@ function App() {
         </div>
 
         {/* Footer */}
-        <footer className="bg-dark text-light py-4 mt-auto">
-          <div className="container text-center">
-            <span>&copy; {new Date().getFullYear()} MWALIMU Towers ICT System. All rights reserved.</span>
+        <footer className="bg-gray-900 text-gray-200 py-8 mt-auto">
+          <div className="container">
+            <div className="row">
+              <div className="col-md-4 mb-4">
+                <div className="flex items-center gap-3">
+                  <img src={mwalimuLogo} alt="logo" style={{height: '40px', borderRadius: '8px', background: 'rgba(255,255,255,0.04)', padding: '4px'}} />
+                  <div>
+                    <div className="font-bold">MWALIMU ICT</div>
+                    <div className="text-xs text-gray-400">Asset & maintenance management</div>
+                  </div>
+                </div>
+              </div>
+              <div className="col-md-4 mb-4">
+                <div className="font-semibold">Quick Links</div>
+                <ul className="list-unstyled mt-2">
+                  <li><Link to="/inventory" className="text-gray-300">Inventory</Link></li>
+                  <li><Link to="/maintenance" className="text-gray-300">Maintenance</Link></li>
+                  <li><Link to="/transfers" className="text-gray-300">Transfers</Link></li>
+                </ul>
+              </div>
+              <div className="col-md-4 mb-4">
+                <div className="font-semibold">Contact</div>
+                <div className="text-xs text-gray-400 mt-2">support@mwalimu.local</div>
+                <div className="text-xs text-gray-400">+254 700 000 000</div>
+              </div>
+            </div>
+            <div className="text-center text-xs text-gray-500 mt-4">&copy; {new Date().getFullYear()} MWALIMU Towers ICT System. All rights reserved.</div>
           </div>
         </footer>
       </div>
