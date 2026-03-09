@@ -888,6 +888,163 @@ app.post('/api/transfers', requireLogin, (req, res) => {
   });
 });
 
+// ── Gold/USD Market Structure ────────────────────────────────────────────────
+
+/**
+ * Build a set of realistic demo OHLC candles for XAU/USD centred on a
+ * "current" price.  Used only when the live Yahoo Finance feed is unavailable.
+ */
+function buildDemoCandles(basePrice, count) {
+  const candles = [];
+  let close = basePrice;
+  const now = Math.floor(Date.now() / 1000);
+  for (let i = count - 1; i >= 0; i--) {
+    const ts = now - i * 3600;
+    const change = (Math.random() - 0.5) * 8;
+    const open = close;
+    close = Math.round((open + change) * 100) / 100;
+    const high = Math.round((Math.max(open, close) + Math.random() * 5) * 100) / 100;
+    const low  = Math.round((Math.min(open, close) - Math.random() * 5) * 100) / 100;
+    candles.push({ ts, open, high, low, close });
+  }
+  return candles;
+}
+
+/**
+ * Detect swing highs and lows in a candle array.
+ * A swing high at index i means candles[i].high > every high in [i-left, i+right].
+ * Returns an array of { index, type: 'high'|'low', price, ts }.
+ */
+function detectSwings(candles, left = 3, right = 3) {
+  const swings = [];
+  for (let i = left; i < candles.length - right; i++) {
+    const c = candles[i];
+    let isHigh = true;
+    let isLow  = true;
+    for (let j = i - left; j <= i + right; j++) {
+      if (j === i) continue;
+      if (candles[j].high >= c.high) isHigh = false;
+      if (candles[j].low  <= c.low)  isLow  = false;
+    }
+    if (isHigh) swings.push({ index: i, type: 'high', price: c.high, ts: c.ts });
+    if (isLow)  swings.push({ index: i, type: 'low',  price: c.low,  ts: c.ts });
+  }
+  return swings;
+}
+
+/**
+ * Label swing points as HH / HL / LH / LL and detect BOS / CHoCH events.
+ */
+function analyzeStructure(swings) {
+  const points = [];
+  let lastHigh = null;
+  let lastLow  = null;
+  let trend    = null; // 'bullish' | 'bearish' | null
+  const events = [];
+
+  for (const s of swings) {
+    if (s.type === 'high') {
+      let label = 'SH'; // generic swing high until we have a reference
+      if (lastHigh !== null) {
+        if (s.price > lastHigh.price) {
+          label = 'HH';
+          if (trend === 'bearish') events.push({ type: 'CHoCH', price: s.price, ts: s.ts, dir: 'bullish' });
+          else if (trend === 'bullish') events.push({ type: 'BOS', price: s.price, ts: s.ts, dir: 'bullish' });
+          trend = 'bullish';
+        } else {
+          label = 'LH';
+          if (trend === 'bullish') events.push({ type: 'CHoCH', price: s.price, ts: s.ts, dir: 'bearish' });
+          else if (trend === 'bearish') events.push({ type: 'BOS', price: s.price, ts: s.ts, dir: 'bearish' });
+          trend = 'bearish';
+        }
+      }
+      lastHigh = { ...s, label };
+      points.push({ ...s, label });
+    } else {
+      let label = 'SL';
+      if (lastLow !== null) {
+        label = s.price > lastLow.price ? 'HL' : 'LL';
+        if (label === 'HL' && trend === null) trend = 'bullish';
+        if (label === 'LL' && trend === null) trend = 'bearish';
+      }
+      lastLow = { ...s, label };
+      points.push({ ...s, label });
+    }
+  }
+  return { points, events, trend };
+}
+
+// Approximate current XAU/USD price used when live data is unavailable
+const GOLD_DEMO_BASE_PRICE = 3300;
+
+// GET /api/market-structure/gold-usd
+// Returns candle data + analysed market structure for XAU/USD.
+// Tries Yahoo Finance first; falls back to demo data if unavailable.
+app.get('/api/market-structure/gold-usd', requireLogin, async (req, res) => {
+  const interval = req.query.interval || '1h';
+  const range    = req.query.range    || '5d';
+  const YAHOO_URL =
+    `https://query1.finance.yahoo.com/v8/finance/chart/XAUUSD=X` +
+    `?interval=${encodeURIComponent(interval)}&range=${encodeURIComponent(range)}`;
+
+  let candles = [];
+  let source  = 'live';
+
+  try {
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), 7000);
+    const yRes = await fetch(YAHOO_URL, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    clearTimeout(tid);
+
+    if (yRes.ok) {
+      const data  = await yRes.json();
+      const chart = data?.chart?.result?.[0];
+      if (chart) {
+        const timestamps = chart.timestamp || [];
+        const q = chart.indicators?.quote?.[0] || {};
+        for (let i = 0; i < timestamps.length; i++) {
+          if (q.close[i] == null) continue;
+          candles.push({
+            ts:    timestamps[i],
+            open:  Math.round((q.open[i]  || q.close[i]) * 100) / 100,
+            high:  Math.round((q.high[i]  || q.close[i]) * 100) / 100,
+            low:   Math.round((q.low[i]   || q.close[i]) * 100) / 100,
+            close: Math.round( q.close[i]                * 100) / 100
+          });
+        }
+      }
+    }
+  } catch (_) {
+    // network error or timeout – fall through to demo data
+  }
+
+  if (candles.length < 10) {
+    source  = 'demo';
+    candles = buildDemoCandles(GOLD_DEMO_BASE_PRICE, 72);
+  }
+
+  const swings            = detectSwings(candles);
+  const { points, events, trend } = analyzeStructure(swings);
+  const latest            = candles[candles.length - 1];
+
+  res.json({
+    symbol:      'XAU/USD',
+    interval,
+    range,
+    source,
+    currentPrice: latest?.close ?? null,
+    candles,
+    swingPoints: points,
+    events,
+    trend: trend || 'neutral'
+  });
+});
+
+// ── End Market Structure ──────────────────────────────────────────────────────
+
 // List transfers (optional filter by status)
 app.get('/api/transfers', requireLogin, (req, res) => {
   const status = req.query.status;

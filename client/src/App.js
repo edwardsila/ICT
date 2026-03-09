@@ -15,6 +15,7 @@ import Register from './pages/Register';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
 import SearchBar from './components/SearchBar';
+import MarketStructure from './pages/MarketStructure';
 import { useUser } from './context/UserContext';
 
 // Wrapper for Reports page to show message for non-admins
@@ -267,6 +268,11 @@ function App() {
                 <li className="nav-item">
                   <Link className="nav-link" to="/maintenance">Maintenance</Link>
                 </li>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/market-structure">
+                    <i className="bi bi-graph-up-arrow me-1"></i>Gold/USD
+                  </Link>
+                </li>
                 {currentUser?.role === 'admin' && (
                   <>
                     <li className="nav-item">
@@ -307,6 +313,7 @@ function App() {
             <Route path="/reports" element={<ProtectedRoute element={<ReportsMessageWrapper />} adminOnly={true} />} />
             <Route path="/admin/*" element={<ProtectedRoute element={<AdminLayout />} adminOnly={true} />} />
             <Route path="/transfers" element={<ProtectedRoute element={<Transfers />} />} />
+            <Route path="/market-structure" element={<ProtectedRoute element={<MarketStructure />} />} />
             <Route path="/users" element={<ProtectedRoute element={<Users />} />} />
             <Route path="/settings" element={<ProtectedRoute element={<Settings />} />} />
             <Route path="/login" element={<Login />} />
@@ -334,6 +341,7 @@ function App() {
                   <li><Link to="/inventory" className="text-gray-300">Inventory</Link></li>
                   <li><Link to="/maintenance" className="text-gray-300">Maintenance</Link></li>
                   <li><Link to="/transfers" className="text-gray-300">Transfers</Link></li>
+                  <li><Link to="/market-structure" className="text-gray-300">Gold/USD Structure</Link></li>
                 </ul>
               </div>
               <div className="col-md-4 mb-4">
