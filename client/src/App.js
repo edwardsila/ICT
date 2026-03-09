@@ -14,6 +14,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
+import MarketStructure from './pages/MarketStructure';
 import SearchBar from './components/SearchBar';
 import { useUser } from './context/UserContext';
 
@@ -267,6 +268,9 @@ function App() {
                 <li className="nav-item">
                   <Link className="nav-link" to="/maintenance">Maintenance</Link>
                 </li>
+                <li className="nav-item">
+                  <Link className="nav-link" to="/market-structure"><i className="bi bi-graph-up-arrow me-1"></i>Gold/USD</Link>
+                </li>
                 {currentUser?.role === 'admin' && (
                   <>
                     <li className="nav-item">
@@ -304,6 +308,7 @@ function App() {
             <Route path="/" element={<ModernHome currentUser={currentUser} />} />
             <Route path="/inventory" element={<ProtectedRoute element={<Inventory />} />} />
             <Route path="/maintenance" element={<ProtectedRoute element={<Maintenance />} />} />
+            <Route path="/market-structure" element={<ProtectedRoute element={<MarketStructure />} />} />
             <Route path="/reports" element={<ProtectedRoute element={<ReportsMessageWrapper />} adminOnly={true} />} />
             <Route path="/admin/*" element={<ProtectedRoute element={<AdminLayout />} adminOnly={true} />} />
             <Route path="/transfers" element={<ProtectedRoute element={<Transfers />} />} />
