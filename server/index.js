@@ -7,6 +7,7 @@ const Database = require('better-sqlite3');
 const fs = require('fs');
 const cors = require('cors');
 const path = require('path');
+const fetch = require('node-fetch');
 
 const app = express();
 const session = require('express-session');
@@ -974,4 +975,86 @@ app.post('/api/transfers/:id/complete-replacement', requireLogin, (req, res) => 
       return res.status(400).json({ error: 'Provide either replacement_inventory_id or replacement_details' });
     }
   });
+});
+
+// ── Market Structure: Gold/USD (XAUUSD) ─────────────────────────────────────
+// Proxy Yahoo Finance OHLCV data to avoid CORS on the browser.
+// Query params: interval (1h | 1d), range (5d | 1mo | 3mo)
+
+// Generate realistic-looking sample XAUUSD candlestick data for fallback use
+function generateSampleXAUUSD(intervalParam, rangeParam) {
+  const now      = Math.floor(Date.now() / 1000);
+  const stepSecs = intervalParam === '1d' ? 86400 : 3600;
+  const count    =
+    rangeParam === '3mo' ? (intervalParam === '1d' ? 63 : 63 * 8) :
+    rangeParam === '1mo' ? (intervalParam === '1d' ? 22 : 22 * 8) :
+    /* 5d */               (intervalParam === '1d' ?  5 :  5 * 8);
+
+  const candles = [];
+  let price = 3300; // approximate XAUUSD starting price
+  const startTime = now - count * stepSecs;
+
+  for (let i = 0; i < count; i++) {
+    const t       = startTime + i * stepSecs;
+    // simple random walk with slight upward drift
+    const drift   = 0.0003;
+    const vol     = 8;
+    price = price * (1 + drift + (Math.random() - 0.5) * vol / price);
+    const range   = price * 0.004 * (0.5 + Math.random());
+    const open    = price + (Math.random() - 0.5) * range * 0.5;
+    const close   = price + (Math.random() - 0.5) * range * 0.8;
+    const high    = Math.max(open, close) + Math.random() * range * 0.4;
+    const low     = Math.min(open, close) - Math.random() * range * 0.4;
+    price         = close;
+    candles.push({
+      time:   t,
+      open:   +open.toFixed(2),
+      high:   +high.toFixed(2),
+      low:    +low.toFixed(2),
+      close:  +close.toFixed(2),
+      volume: Math.floor(50000 + Math.random() * 150000)
+    });
+  }
+  return candles;
+}
+
+app.get('/api/market-structure/xauusd', async (req, res) => {
+  const interval = ['1h', '1d'].includes(req.query.interval) ? req.query.interval : '1h';
+  const range    = ['5d', '1mo', '3mo'].includes(req.query.range) ? req.query.range : '5d';
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/XAUUSD=X?interval=${interval}&range=${range}`;
+  try {
+    const yahooRes = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      timeout: 8000
+    });
+    if (!yahooRes.ok) throw new Error(`Yahoo Finance returned ${yahooRes.status}`);
+
+    const data   = await yahooRes.json();
+    const result = data && data.chart && data.chart.result && data.chart.result[0];
+    if (!result) throw new Error('Unexpected Yahoo Finance response structure');
+
+    const timestamps = result.timestamp || [];
+    const quote      = (result.indicators && result.indicators.quote && result.indicators.quote[0]) || {};
+    const opens      = quote.open   || [];
+    const highs      = quote.high   || [];
+    const lows       = quote.low    || [];
+    const closes     = quote.close  || [];
+    const volumes    = quote.volume || [];
+
+    const candles = timestamps.map((t, i) => ({
+      time:   t,
+      open:   opens[i]  != null ? +opens[i].toFixed(2)  : null,
+      high:   highs[i]  != null ? +highs[i].toFixed(2)  : null,
+      low:    lows[i]   != null ? +lows[i].toFixed(2)   : null,
+      close:  closes[i] != null ? +closes[i].toFixed(2) : null,
+      volume: volumes[i] || 0
+    })).filter(c => c.open !== null && c.high !== null && c.low !== null && c.close !== null);
+
+    res.json({ candles, interval, range, source: 'live' });
+  } catch (err) {
+    // Live data unavailable – return generated sample data so the UI remains functional
+    console.warn('Market structure live fetch failed, using sample data:', err.message);
+    const candles = generateSampleXAUUSD(interval, range);
+    res.json({ candles, interval, range, source: 'sample' });
+  }
 });
